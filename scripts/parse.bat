@@ -1,4 +1,5 @@
+@echo off
 cd ..
 pipenv run py -m src.build
 cd scripts
-pause
+if ERRORLEVEL 1 pause

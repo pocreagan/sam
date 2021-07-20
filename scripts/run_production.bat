@@ -1,4 +1,5 @@
+@echo off
 cd ..
 "dist/Sam.exe"
-cd scripts
 if ERRORLEVEL 1 pause
+cd scripts
