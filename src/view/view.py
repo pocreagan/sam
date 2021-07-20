@@ -298,7 +298,7 @@ class View(MDApp):
     TITLE = 'Sam'
 
     def __init__(self, **kwargs) -> None:
-        kwargs['title'] = TITLE
+        kwargs['title'] = type(self).TITLE
         self.stack: Dict[str, db.Food] = dict()
         self.food_cards: Dict[str, FoodCard] = dict()
         self.model = Model(**__RESOURCE__.cfg('app.yml', parse=True))
