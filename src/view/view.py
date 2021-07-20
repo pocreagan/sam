@@ -332,6 +332,12 @@ class View(MDApp):
         self.screen_manager.current = 'populated_stack'
         self.screen_manager.current = 'empty_stack'
 
+        try:
+            import pyi_splash
+            pyi_splash.close()
+        except ImportError:
+            pass
+
         return self.root
 
     @staticmethod
