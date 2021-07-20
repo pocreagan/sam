@@ -2,7 +2,6 @@
 /.vscode/
 /dist/
 /build/
-/dev/
 /resources/db/*.db
 /src/_notebook/
 /resources/cfg/build.yml

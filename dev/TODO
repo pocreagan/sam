@@ -1,0 +1,14 @@
+scrape RACC
+diff RACC from prev
+    if necessary
+        for each change
+            update bucket -> serving size lookup
+
+
+BUGS
+
+
+FEATURES
+add dyn food id search
+stop the rendering shit at the beginning
+fix kivy on top thing
