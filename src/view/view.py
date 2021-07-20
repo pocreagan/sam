@@ -32,6 +32,8 @@ from kivymd.uix.snackbar import BaseSnackbar
 from kivymd.uix.textfield import MDTextField
 from kivymd.utils.fitimage import FitImage
 
+from KivyOnTop import register_topmost, unregister_topmost
+
 from src import __RESOURCE__
 from src import model
 from src.base import loggers
@@ -293,8 +295,10 @@ class View(MDApp):
 
     analysis_screen: AnalysisScreen
 
+    TITLE = 'Sam'
+
     def __init__(self, **kwargs) -> None:
-        kwargs['title'] = 'Sam'
+        kwargs['title'] = TITLE
         self.stack: Dict[str, db.Food] = dict()
         self.food_cards: Dict[str, FoodCard] = dict()
         self.model = Model(**__RESOURCE__.cfg('app.yml', parse=True))
@@ -305,6 +309,16 @@ class View(MDApp):
         with self.session_manager() as session:
             self.regions_d: Dict[str, db.Region] = db.Region.all(session)
         super().__init__(**kwargs)
+
+    def on_start(self, *args) -> None:
+        _title = type(self).TITLE
+        register_topmost(Window, _title)
+        
+        @mainthread
+        def callback(*args) -> None:
+            unregister_topmost(Window, _title)
+        
+        callback()
 
     def build(self):
         self.theme_cls.colors = THEME
