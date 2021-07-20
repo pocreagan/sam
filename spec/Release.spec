@@ -6,6 +6,7 @@ ENTRY_POINT = r'__ENTRY_POINT__'
 ROOT_DIR = r'__ROOT_DIR__'
 APP_NAME = r'__APP_NAME__'
 ICON_PATH = r'__ICON_PATH__'
+SPLASH_PATH = r'__SPLASH_PATH__'
 
 import PyInstaller.config
 from pathlib import Path
@@ -36,9 +37,20 @@ pyz = PYZ(a.pure, a.zipped_data,
 
 from kivy_deps import sdl2, glew
 
+
+splash = Splash(SPLASH_PATH,
+                binaries=a.binaries,
+                datas=a.datas,
+                text_pos=(5, 250),
+                text_size=12,
+                text_color='black')
+
+
 exe = EXE(pyz,
           Tree(r'resources', prefix=r'resources'),
           a.scripts,
+          splash,
+          splash.binaries,
           a.binaries,
           a.zipfiles,
           a.datas,

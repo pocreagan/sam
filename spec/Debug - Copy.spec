@@ -6,7 +6,6 @@ ENTRY_POINT = r'__ENTRY_POINT__'
 ROOT_DIR = r'__ROOT_DIR__'
 APP_NAME = r'__APP_NAME__'
 ICON_PATH = r'__ICON_PATH__'
-SPLASH_PATH = r'__SPLASH_PATH__'
 
 import PyInstaller.config
 from pathlib import Path
@@ -31,13 +30,6 @@ a = Analysis([ENTRY_POINT],
              win_private_assemblies=False,
              cipher=block_cipher,
              noarchive=False)
-
-splash = Splash(SPLASH_PATH,
-                binaries=a.binaries,
-                datas=a.datas,
-                text_pos=(5, 250),
-                text_size=12,
-                text_color='black')
 
 pyz = PYZ(a.pure, a.zipped_data,
              cipher=block_cipher)

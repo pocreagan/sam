@@ -20,7 +20,9 @@ CONN_STRING = 'sqlite:///' + __RESOURCE__.db('backend.db')
 DIST_PATH = __RESOURCE__.PROJECT_ROOT / 'dist'
 DAT_PATH = __RESOURCE__.PROJECT_ROOT / 'dat'
 
+
 SPEC_CHANGES = {
+    '__SPLASH_PATH__': __RESOURCE__.img('splash.png'),
     '__ICON_PATH__': __RESOURCE__.img('android-chrome-512x512.ico'),
     '__ENTRY_POINT__': __RESOURCE__.PROJECT_ROOT / 'src' / 'app.py',
     '__ROOT_DIR__': __RESOURCE__.PROJECT_ROOT, '__DIST_PATH__': DIST_PATH,
