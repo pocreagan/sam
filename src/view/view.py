@@ -7,6 +7,7 @@ from kivy import Logger
 from kivy.animation import Animation
 from kivy.clock import Clock
 from kivy.clock import mainthread
+from kivy.core.window import Window
 from kivy.input import MotionEvent
 from kivy.lang import Builder
 from kivy.properties import BooleanProperty
@@ -27,13 +28,11 @@ from kivymd.app import MDApp
 from kivymd.uix.boxlayout import MDBoxLayout
 from kivymd.uix.card import MDCard
 from kivymd.uix.label import MDLabel
-from kivy.core.window import Window
 # noinspection PyProtectedMember
 from kivymd.uix.snackbar import BaseSnackbar
 from kivymd.uix.textfield import MDTextField
 from kivymd.utils.fitimage import FitImage
-
-from KivyOnTop import register_topmost, unregister_topmost
+from KivyOnTop import register_topmost
 
 from src import __RESOURCE__
 from src import model
@@ -313,8 +312,16 @@ class View(MDApp):
 
     def on_start(self, *args) -> None:
         _title = type(self).TITLE
+
+        try:
+            # noinspection PyUnresolvedReferences
+            import pyi_splash
+            pyi_splash.close()
+        except ImportError:
+            pass
+
         register_topmost(Window, _title)
-        
+
     def build(self):
         self.theme_cls.colors = THEME
         self.theme_cls.primary_palette = PRIMARY_PALETTE
@@ -340,13 +347,6 @@ class View(MDApp):
 
         self.screen_manager.current = 'populated_stack'
         self.screen_manager.current = 'empty_stack'
-
-        try:
-            # noinspection PyUnresolvedReferences
-            import pyi_splash
-            pyi_splash.close()
-        except ImportError:
-            pass
 
         return self.root
 
