@@ -35,9 +35,9 @@ a = Analysis([ENTRY_POINT],
 splash = Splash(SPLASH_PATH,
                 binaries=a.binaries,
                 datas=a.datas,
-                text_pos=(5, 250),
+                text_pos=(250, 5),
                 text_size=12,
-                text_color='black')
+                text_color='white')
 
 pyz = PYZ(a.pure, a.zipped_data,
              cipher=block_cipher)

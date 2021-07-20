@@ -43,7 +43,7 @@ splash = Splash(SPLASH_PATH,
                 datas=a.datas,
                 text_pos=(5, 250),
                 text_size=12,
-                text_color='black')
+                text_color='white')
 
 
 exe = EXE(pyz,
