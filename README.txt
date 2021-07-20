@@ -37,6 +37,8 @@
         <./spec/Release.spec>
     run_production.bat
         runs Sam.exe
+    commit.bat
+        git add, git commit
 
 ./spec contains PyInstaller build specifications
     Debug.spec

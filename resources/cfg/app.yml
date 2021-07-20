@@ -1,5 +1,3 @@
 USDA_API_KEY: "IAq4gn3KahA24GAAeEOZLNO6ghwzTWWtU7awLFw5"
 USDA_REST_ENDPOINT: "https://api.nal.usda.gov/fdc/v1/foods/search?api_key="
-AGILE_FILE_PATH: "c:/projects/nutrition/deployment/Agile.xlsx"
-DATA_FILE_PATH: "c:/projects/nutrition/deployment/Data.xlsx"
 CONNECTION_STRING_SUFFIX: "backend.db"
