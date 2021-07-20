@@ -311,10 +311,6 @@ class View(MDApp):
 
     def on_start(self, *args) -> None:
         log.info(f'on_start called {time.perf_counter()}')
-        Clock.schedule_once(self.on_startup, time.perf_counter() + .5)
-
-    def on_startup(self, *_):
-        log.info(f'on_startup called {time.perf_counter()}')
         register_topmost(Window, type(self).TITLE)
 
         with log.timer('Config read on startup'):
