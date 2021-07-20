@@ -275,7 +275,7 @@ def make_region(wb: xlsxWorkbook, region: Region) -> None:
 
 
 def make_summary(wb: xlsxWorkbook, output: Output) -> None:
-    ws = start_sheet(wb, 'Summary', SUMMARY_COL_WIDTHS_CHAR, SUMMARY_ROW_HEIGHTS_CHAR, 160)
+    ws = start_sheet(wb, 'Summary', SUMMARY_COL_WIDTHS_CHAR, SUMMARY_ROW_HEIGHTS_CHAR, 130)
     ws.insert_image(1, 1, __RESOURCE__.img('summary_logo.png'))
 
     with Format.white_background():
