@@ -44,6 +44,7 @@ pyz = PYZ(a.pure, a.zipped_data,
 
 exe = EXE(pyz,
           a.scripts,
+          splash,
           [],
           exclude_binaries=True,
           name=APP_NAME,
@@ -59,6 +60,7 @@ from kivy_deps import sdl2, glew
 
 coll = COLLECT(exe,
                Tree(r'resources', prefix=r'resources'),
+               splash.binaries,
                a.binaries,
                a.zipfiles,
                a.datas,
