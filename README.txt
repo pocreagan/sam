@@ -46,3 +46,7 @@
     Release.spec
         build application as an executable
         compressed
+
+
+edit PyInstaller:
+    PyInstaller\hooks\rthooks\pyi_rth_pkgutil.py", line 71 to be str(path)
