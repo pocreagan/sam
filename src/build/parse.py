@@ -2,7 +2,6 @@ import contextlib
 import dataclasses
 import functools
 import io
-import multiprocessing
 import queue
 import time
 from collections import defaultdict
@@ -132,8 +131,9 @@ def read_workbook_buffer(logger: loggers.Logger, fp: Path, sheets: List[str]) ->
 
 
 @contextlib.contextmanager
-def workbook(log: loggers.Logger, wb: Union[Dict[str, pd.DataFrame], pd.DataFrame]) -> ContextManager[
-    Dict[str, pd.DataFrame]]:
+def workbook(
+        log: loggers.Logger, wb: Union[Dict[str, pd.DataFrame], pd.DataFrame]
+) -> ContextManager[Dict[str, pd.DataFrame]]:
     ti = time.perf_counter()
     log.debug(f'Parsing...')
 
@@ -187,7 +187,7 @@ class Parser:
 
     def __init__(self, root_logger: loggers.Logger) -> None:
         self.log = root_logger.spawn('Parser')
-        self.q = multiprocessing.Queue()
+        self.q = queue.Queue()
 
     def run(self, dat_fp: Path, agile_fp: Path, usda_url: str, connection_string: str) -> None:
         ti = time.perf_counter()
@@ -206,6 +206,7 @@ class Parser:
             self.parse_agile(resolve(agile_future), model)
 
             resolve(usda_future)
+            resolve(db_future)
             self.persist_records()
 
         self.log.info(f'Built app backend ({format_time(time.perf_counter() - ti)})')
