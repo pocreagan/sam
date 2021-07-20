@@ -2,7 +2,6 @@ import contextlib
 import dataclasses
 import functools
 import io
-import queue
 import time
 from collections import defaultdict
 from collections import deque
@@ -187,7 +186,7 @@ class Parser:
 
     def __init__(self, root_logger: loggers.Logger) -> None:
         self.log = root_logger.spawn('Parser')
-        self.q = queue.Queue()
+        self.q = deque()
 
     def run(self, dat_fp: Path, agile_fp: Path, usda_url: str, connection_string: str) -> None:
         ti = time.perf_counter()
@@ -277,7 +276,7 @@ class Parser:
         if len(staged) != len(model.usda.foods):
             raise ParseFailure('No response to request for USDA food(s)')
 
-        self.q.put(list(staged))
+        self.q.append(list(staged))
 
         log.info(f'Parsed USDA food data ({format_time(time.perf_counter() - ti)})')
 
@@ -327,7 +326,7 @@ class Parser:
                                                   canonical_ids, values)
                                               ), canonical_ids)))
 
-                self.q.put(list(staged))
+                self.q.append(list(staged))
 
     def parse_dat(self, wb: Dict[str, pd.DataFrame]) -> Model:
         log = self.log.spawn('Data Sheet')
@@ -343,7 +342,7 @@ class Parser:
                     staged.append(nut)
                 model = Model(staged)
 
-            self.q.put(list(staged))
+            self.q.append(list(staged))
             staged.clear()
 
             with worksheet(log, wb, 'USDAFoods', ['FoodID', 'QTY (g)']) as ws:
@@ -406,7 +405,7 @@ class Parser:
                     check_and_insert(log, row_num, model.agile_column_multipliers, name,
                                      round(float(multiplier), 6), f'column name `{name}`')
 
-            self.q.put(list(staged))
+            self.q.append(list(staged))
 
         return model
 
@@ -425,14 +424,8 @@ class Parser:
 
         with log.timer('Persisted records'):
 
-            while 1:
-                with self.session_manager() as session:
-                    try:
-                        message = self.q.get_nowait()
-                    except queue.Empty:
-                        break
-
-                    records = message
+            with self.session_manager() as session:
+                for records in self.q:
                     with log.timer(f'Added {len(records)} records'):
                         cla = type(records[-1])
                         if cla is db.Nutrient:
