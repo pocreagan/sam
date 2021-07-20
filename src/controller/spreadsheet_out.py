@@ -308,7 +308,9 @@ def make_summary(wb: xlsxWorkbook, output: Output) -> None:
 
 
 def make(output: Output, name: str) -> None:
-    output_file_path = Path(os.path.expanduser("~/Desktop")) / f'{name}.xlsx'
+    output_dir = Path(os.path.expanduser("~/Desktop/Sam"))
+    os.makedirs(output_dir, exist_ok=True)
+    output_file_path = output_dir / f'{name}.xlsx'
     if output_file_path.exists():
         os.remove(output_file_path)
 
