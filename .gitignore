@@ -1,0 +1,9 @@
+/.idea/
+/.vscode/
+/dist/
+/build/
+/resources/db/*.db
+/src/_notebook/
+/resources/cfg/build.yml
+*.py[cod]
+__pycache__

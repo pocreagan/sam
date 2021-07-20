@@ -1,0 +1,20 @@
+scrape RACC
+diff RACC from prev
+    if necessary
+        for each change
+            update bucket -> serving size lookup
+
+freeze with fresh commit
+
+
+FEATURES
+
+
+
+BUGS
+output-sheet
+make region sheet row adjustment dynamic over level-exceeded range
+adjust font size down such that 6 char are visible
+blurb
+
+
