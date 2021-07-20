@@ -180,7 +180,7 @@ def make_region(wb: xlsxWorkbook, region: Region) -> None:
     bad_nutrients = [nut for nut in region.nutrients if nut.exceeds_guidance_level]
 
     # row_heights = REGION_ROW_HEIGHTS_CHAR + [(6 + min(1, len(bad_nutrients)), REGION_HEADER_ROW_HEIGHT)]
-    ws = start_sheet(wb, region.name, REGION_COL_WIDTHS_CHAR, REGION_ROW_HEIGHTS_CHAR, 160)
+    ws = start_sheet(wb, region.name, REGION_COL_WIDTHS_CHAR, REGION_ROW_HEIGHTS_CHAR, 100)
 
     with Format.white_background():
         # write region info at the top left
