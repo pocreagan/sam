@@ -315,6 +315,8 @@ class View(MDApp):
 
     def on_startup(self, *_):
         log.info(f'on_startup called {time.perf_counter()}')
+        register_topmost(Window, type(self).TITLE)
+
         with log.timer('Config read on startup'):
             self.model = Model(**__RESOURCE__.cfg('app.yml', parse=True))
             self.build_obj = Build(**__RESOURCE__.cfg('build.yml', parse=True))
@@ -330,8 +332,6 @@ class View(MDApp):
             pyi_splash.close()
         except ImportError:
             pass
-
-        register_topmost(Window, type(self).TITLE)
 
     def build(self):
         self.theme_cls.colors = THEME
