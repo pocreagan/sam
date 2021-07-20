@@ -315,12 +315,6 @@ class View(MDApp):
         _title = type(self).TITLE
         register_topmost(Window, _title)
         
-        @mainthread
-        def callback(*args) -> None:
-            unregister_topmost(Window, _title)
-        
-        callback()
-
     def build(self):
         self.theme_cls.colors = THEME
         self.theme_cls.primary_palette = PRIMARY_PALETTE
@@ -348,6 +342,7 @@ class View(MDApp):
         self.screen_manager.current = 'empty_stack'
 
         try:
+            # noinspection PyUnresolvedReferences
             import pyi_splash
             pyi_splash.close()
         except ImportError:

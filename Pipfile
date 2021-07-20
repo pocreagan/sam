@@ -14,6 +14,7 @@ xlsxwriter = "1.4.4"
 requests = "*"
 requests-toolbelt = "*"
 click = "*"
+kivyontop = "*"
 
 [dev-packages]
 pyinstaller = "==4.4"
