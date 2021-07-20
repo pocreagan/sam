@@ -1,4 +1,5 @@
 <SETUP>
+	add `/dat/` to `./.gitignore` <- talk to patrick here
 	download `Windows x86-64 executable installer` from `https://www.python.org/downloads/release/python-379/`
 	install for all users and add to PATH
 	in `c:/projects` run `git clone https://github.com/pocreagan/sam.git`
