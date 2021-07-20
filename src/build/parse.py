@@ -256,7 +256,7 @@ class Parser:
                 if not usda_nutrient:
                     continue
 
-                value = round(usda_nutrient.multiplier * float(d['value']), 6)
+                value = round(usda_nutrient.multiplier * float(d['value']) * model.usda.foods[food_id] * .01, 6)
                 if value:
                     food_nutrients[usda_nutrient.name_id] = str(value)
 
