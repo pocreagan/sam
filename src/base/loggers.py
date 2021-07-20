@@ -98,7 +98,7 @@ class Logger:
             raise
 
         else:
-            self.debug(f'{string} ({format_time(time.perf_counter() - _ti)})')
+            self.info(f'{string} ({format_time(time.perf_counter() - _ti)})')
 
     def warning(self, *message, exc_info=True, **kwargs) -> None:
         if self.isEnabledFor(logging.WARNING):

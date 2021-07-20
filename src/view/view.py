@@ -1,4 +1,5 @@
 import datetime
+import time
 from typing import Dict
 from typing import List
 from typing import Set
@@ -39,6 +40,7 @@ from src import model
 from src.base import loggers
 from src.controller import spreadsheet_out
 from src.model import db
+from src.model import SessionManager
 from src.model.config import Build
 from src.model.config import Model
 from src.model.enums import FoodSource
@@ -296,22 +298,31 @@ class View(MDApp):
     analysis_screen: AnalysisScreen
 
     TITLE = 'Sam'
+    session_manager: SessionManager
+    regions_d: Dict[str, db.Region]
+    model: Model
+    build_obj: Build
 
     def __init__(self, **kwargs) -> None:
         kwargs['title'] = type(self).TITLE
         self.stack: Dict[str, db.Food] = dict()
         self.food_cards: Dict[str, FoodCard] = dict()
-        self.model = Model(**__RESOURCE__.cfg('app.yml', parse=True))
-        self.build_obj = Build(**__RESOURCE__.cfg('build.yml', parse=True))
-        self.session_manager = model.Database(
-            db.Schema, f'sqlite:///{__RESOURCE__.db(self.model.CONNECTION_STRING_SUFFIX)}'
-        ).connect(log.spawn('Database'))
-        with self.session_manager() as session:
-            self.regions_d: Dict[str, db.Region] = db.Region.all(session)
         super().__init__(**kwargs)
 
     def on_start(self, *args) -> None:
-        _title = type(self).TITLE
+        log.info(f'on_start called {time.perf_counter()}')
+        Clock.schedule_once(self.on_startup, time.perf_counter() + .5)
+
+    def on_startup(self, *_):
+        log.info(f'on_startup called {time.perf_counter()}')
+        with log.timer('Config read on startup'):
+            self.model = Model(**__RESOURCE__.cfg('app.yml', parse=True))
+            self.build_obj = Build(**__RESOURCE__.cfg('build.yml', parse=True))
+            self.session_manager = model.Database(
+                db.Schema, f'sqlite:///{__RESOURCE__.db(self.model.CONNECTION_STRING_SUFFIX)}'
+            ).connect(log.spawn('Database'))
+            with self.session_manager() as session:
+                self.regions_d: Dict[str, db.Region] = db.Region.all(session)
 
         try:
             # noinspection PyUnresolvedReferences
@@ -320,7 +331,7 @@ class View(MDApp):
         except ImportError:
             pass
 
-        register_topmost(Window, _title)
+        register_topmost(Window, type(self).TITLE)
 
     def build(self):
         self.theme_cls.colors = THEME
