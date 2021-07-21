@@ -54,14 +54,8 @@ __all__ = [
 log = loggers.Logger('View', Logger)
 
 
-class RemoveFoodButton(Image):
-    parent: FloatLayout = ObjectProperty(None)
-
-    def on_touch_down(self, touch: MotionEvent) -> bool:
-        if self.collide_point(*touch.pos):
-            self.parent.parent.root.kill()
-
-        return super().on_touch_down(touch)
+class RemoveFoodButton(ButtonBehavior, Image):
+    pass
 
 
 class SourceLogo(FloatLayout):

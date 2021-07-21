@@ -106,6 +106,7 @@
         source: 'remove-food.png'
         pos_hint: {'x': .75, 'y': .75}
         size_hint: [.35, .35]
+        on_press: app.remove_from_stack(self.parent.parent.root)
 
 
 <FoodLabel@BoxLayout>:
