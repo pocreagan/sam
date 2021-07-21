@@ -161,14 +161,15 @@ class RegionChip(ButtonBehavior, BoxLayout):
         self.check_mark = CheckMark()
         self.animation = Animation(color=self.selected_color, d=0.3)
 
-    def on_press(self) -> None:
-        self.selected = not self.selected
-        _regions = self.parent.app.selected_regions
-
+        @mainthread
         def callback(*_) -> None:
             self.parent.app.root.search_bar.clear_field(False)
 
-        Clock.schedule_once(callback, .1)
+        self.animation.bind(on_complete=callback)
+
+    def on_press(self) -> None:
+        self.selected = not self.selected
+        _regions = self.parent.app.selected_regions
 
         if self.selected:
             # noinspection PyProtectedMember
