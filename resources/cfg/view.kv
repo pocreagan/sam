@@ -72,6 +72,7 @@
     duration: 2.
     size_hint_y: 110 / 800
     bg_color: light_grey
+    on_press: self.dismiss_now()
     MDIconButton:
         pos_hint: {'center_y': .5}
         icon: root.icon
@@ -249,8 +250,6 @@
 <StackLoadOption>:
     on_release: app.select_stack(root.text)
     _no_ripple_effect: True
-    # IconLeftWidget:
-    #     icon: 'trash-can-outline'
     RemoveSavedStack:
         source: 'reset-trans.png'
         on_press: app.delete_stack(root.text)

@@ -27,11 +27,11 @@ from kivy.uix.scrollview import ScrollView
 from kivy.uix.stacklayout import StackLayout
 from kivymd.app import MDApp
 from kivymd.uix.boxlayout import MDBoxLayout
-# noinspection PyProtectedMember
 from kivymd.uix.dialog import MDDialog
 from kivymd.uix.list import ILeftBodyTouch
 from kivymd.uix.list import MDList
 from kivymd.uix.list import TwoLineAvatarListItem
+# noinspection PyProtectedMember
 from kivymd.uix.snackbar import BaseSnackbar
 from kivymd.uix.textfield import MDTextField
 from KivyOnTop import register_topmost
@@ -138,6 +138,27 @@ class FoodCard(FloatLayout):
 class CustomSnackBar(BaseSnackbar):
     text = StringProperty(None)
     icon = StringProperty(None)
+
+    def dismiss_now(self, *args):
+        """Dismiss the snackbar."""
+
+        def dismiss(interval):
+            if self.snackbar_animation_dir == "Top":
+                anim = Animation(y=(Window.height + self.height), d=0.2)
+            elif self.snackbar_animation_dir == "Left":
+                anim = Animation(x=-self.width, d=0.2)
+            elif self.snackbar_animation_dir == "Right":
+                anim = Animation(x=Window.width, d=0.2)
+            else:
+                anim = Animation(y=-self.height, d=0.2)
+
+            anim.bind(
+                on_complete=lambda *args: Window.parent.remove_widget(self)
+            )
+            anim.start(self)
+
+        Clock.schedule_once(dismiss, 0.)
+        self.dispatch("on_dismiss")
 
 
 class CheckMark(BoxLayout):
