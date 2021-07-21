@@ -206,7 +206,7 @@ class Parser:
             self.parse_agile(resolve(agile_future), model)
 
             # resolve(usda_future) todo
-            
+
             resolve(db_future)
             self.persist_records()
 

@@ -13,5 +13,7 @@ add dyn food id search
 
 #! BEFORE CHANGE: b6a6017
 
-get load stack working
 reformat output spreadsheet
+track changes to saved stacks and update load_stack modal without rebuilding it (low)
+
+meet with tech guy

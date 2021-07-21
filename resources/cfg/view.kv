@@ -104,10 +104,32 @@
     RemoveFoodButton:
         source: 'remove-food.png'
         pos_hint: {'x': .75, 'y': .75}
-        size_hint: [.3, .3]
+        size_hint: [.35, .35]
+
+
+<FoodLabel@BoxLayout>:
+    food: None
+    orientation: 'vertical'
+
+    MDLabel:
+        text: root.food.food_id if root.food else ''
+        font_size: '20dp'
+
+    MDLabel:
+        id: description_label
+        font_size: '16dp'
+        text: root.food.description if root.food else ''
+        shorten: True
+        shorten_from: 'right'
+
+    MDLabel:
+        font_size: '18sp'
+        text: ('' if root.food.qty_per_serving == 'NA' else root.food.qty_per_serving) if root.food else ''
+
 
 
 <FoodCard>:
+    food: None
     height: '80dp'
     size_hint: 1, None
     canvas.before:
@@ -117,13 +139,10 @@
             size: self.size
             pos: self.pos
 
-
     qty_field: qty_field
     app: app
-    food: None
 
     BoxLayout:
-        orientation: 'horizontal'
         size: root.size
         pos: root.pos
 
@@ -139,23 +158,8 @@
                 SourceLogoRemovable:
                     source_str: root.food.source.name if root.food else 'USDA'
 
-            BoxLayout:
-                orientation: 'vertical'
-
-                MDLabel:
-                    text: root.food.food_id if root.food else ''
-                    font_size: '20dp'
-
-                MDLabel:
-                    id: description_label
-                    font_size: '16dp'
-                    text: root.food.description if root.food else ''
-                    shorten: True
-                    shorten_from: 'right'
-
-                MDLabel:
-                    font_size: '18sp'
-                    text: ('' if root.food.qty_per_serving == 'NA' else root.food.qty_per_serving) if root.food else ''
+            FoodLabel:
+                food: root.food
 
         BoxLayout:
             orientation: 'vertical'
@@ -165,7 +169,7 @@
                 id: qty_field
                 app: app
                 root: root
-                text: '1.0'
+                text: str(root.validated_qty) if root.validated_qty else '1.0'
                 hint_text: ''
                 font_size: '26sp'
                 multiline: False
@@ -183,15 +187,16 @@
 
 
 <SearchResult>:
+    food: None
+    size_hint: 1, None
+
+
     canvas.before:
         Color:
             rgba: 1, 1, 1, 1
         Rectangle:
             size: self.size
             pos: self.pos
-
-    size_hint: 1, None
-    food: None
 
     BoxLayout:
         orientation: 'horizontal'
@@ -210,22 +215,8 @@
                 SourceLogo:
                     source_str: root.food.source.name if root.food else 'USDA'
 
-            BoxLayout:
-                orientation: 'vertical'
-
-                MDLabel:
-                    text: f'{root.food.food_id}' if root.food else ''
-                    font_size: '20dp'
-
-                MDLabel:
-                    font_size: '16dp'
-                    text: root.food.description if root.food else ''
-                    shorten: True
-                    shorten_from: 'right'
-
-                MDLabel:
-                    font_size: '18sp'
-                    text: ('' if root.food.qty_per_serving == 'NA' else root.food.qty_per_serving) if root.food else ''
+            FoodLabel:
+                food: root.food
 
         AnchorLayout:
             size_hint: .15, 1
@@ -238,11 +229,12 @@
                 on_press: app.add_food(root.food)
                 source: 'add-green.png'
 
-<SaveAsContent>:
+
+<SaveStackContent>:
     orientation: "vertical"
     spacing: "12dp"
     size_hint_y: None
-    height: "120dp"
+    height: "70dp"
     input_field: input_field
 
     MDTextField:
@@ -251,53 +243,28 @@
         hint_text: "Name"
         multiline: False
         selection_color: herbalife_green
-        on_text_validate: app.save_stack_file_name()
+        on_text_validate: app.save_stack_to_file_name(self.text)
 
 
-<SavedStackItem@BoxLayout>:
-    file_name: 'file_name'
-    last_modified: 'last_modified'
-    size_hint: 1, None
-    canvas.before:
-        Color:
-            rgba: 1, 1, 1, 1
-        Rectangle:
-            size: self.size
-            pos: self.pos
+<StackLoadOption>:
+    on_release: app.load_stack_from_file_name(root.text)
+    _no_ripple_effect: True
+    # IconLeftWidget:
+    #     icon: 'trash-can-outline'
+    RemoveSavedStack:
+        source: 'reset-trans.png'
+        on_press: app.remove_saved_stack(root.text)
 
-    orientation: 'horizontal'
-    BoxLayout:
-        orientation: 'vertical'
-        MDLabel:
-            font_size: '20dp'
-            text: root.file_name
-            shorten: True
-            shorten_from: 'right'
-        MDLabel:
-            font_size: '16dp'
-            text: root.last_modified
+<LoadStackContent>:
+    container: container
+    orientation: 'vertical'
 
-    MDFlatButton:
-        text: 'LOAD'
-        text_color: app.theme_cls.primary_color
-        on_press: app.load_stack_file_name(root.file_name)
+    size_hint_y: None
+    height: '480dp'
 
-
-<LoadFromContent>:
-    load_from_options: load_from_options
-    height: "360dp"
-    RecycleView:
-        id: load_from_options
-        viewclass: 'SavedStackItem'
-
-        RecycleBoxLayout:
-            padding: '5dp'
-            spacing: '5dp'
-            default_size: None, dp(80)
-            default_size_hint: 1, None
-            size_hint_y: None
-            height: self.minimum_height
-            orientation: 'vertical'
+    ScrollView:
+        MDList:
+            id: container
 
 
 <RootWidget>:
@@ -354,6 +321,8 @@
                 height: self.minimum_height
                 orientation: 'vertical'
 
+                # SearchResult widgets go here
+
         MDSeparator:
             orientation: 'vertical'
             height: "1dp"
@@ -374,6 +343,8 @@
                     spacing: '5dp'
                     size_hint: 1, None
                     height: self.minimum_height
+
+                    # FoodCard widgets go here
 
     MDSeparator:
         height: "4dp"

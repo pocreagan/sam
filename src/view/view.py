@@ -2,6 +2,7 @@ import csv
 import datetime
 import os
 import time
+from operator import itemgetter
 from pathlib import Path
 from typing import Dict
 from typing import List
@@ -29,8 +30,10 @@ from kivy.uix.stacklayout import StackLayout
 from kivymd.app import MDApp
 from kivymd.uix.boxlayout import MDBoxLayout
 # noinspection PyProtectedMember
-from kivymd.uix.button import MDFlatButton
 from kivymd.uix.dialog import MDDialog
+from kivymd.uix.list import ILeftBodyTouch
+from kivymd.uix.list import MDList
+from kivymd.uix.list import TwoLineAvatarListItem
 from kivymd.uix.snackbar import BaseSnackbar
 from kivymd.uix.textfield import MDTextField
 from KivyOnTop import register_topmost
@@ -118,13 +121,13 @@ class FoodQTYField(MDTextField):
         super().on_focus(_arg, is_focused)
 
 
-class FoodCard(BoxLayout):
+class FoodCard(FloatLayout):
     food: db.Food = ObjectProperty(None)
     app: 'View' = ObjectProperty(None)
     qty_field: FoodQTYField = ObjectProperty(None)
 
     def __init__(self, **kwargs) -> None:
-        self.validated_qty = kwargs.get('validated_qty', 1.0)
+        self.validated_qty = float(kwargs.pop('validated_qty')) if 'validated_qty' in kwargs else 1.0
         super().__init__(**kwargs)
 
     @mainthread
@@ -152,25 +155,38 @@ class RegionChip(ButtonBehavior, BoxLayout):
     label: Label = ObjectProperty(None)
     color = ColorProperty([0, 0, 0, 0])
 
+    animation: Animation
+    check_mark: CheckMark
+
+    def on_kv_post(self, base_widget):
+        self.check_mark = CheckMark()
+        self.animation = Animation(color=self.selected_color, d=0.3)
+
     def on_press(self) -> None:
         self.selected = not self.selected
         _regions = self.parent.app.selected_regions
+
+        def callback(*_) -> None:
+            self.parent.app.root.search_bar.clear_field(False)
+
+        Clock.schedule_once(callback, .1)
+
         if self.selected:
+            # noinspection PyProtectedMember
+            self.animation._animated_properties['color'] = self.selected_color
             _regions.add(self.region_name)
-            _to_color = self.selected_color
-            self.check_box_div.add_widget(CheckMark())
             self.parent.app.region_selected = True
+            self.check_box_div.add_widget(self.check_mark)
+
         else:
-            self.check_box_div.clear_widgets()
-            _to_color = self.default_color
+            # noinspection PyProtectedMember
+            self.animation._animated_properties['color'] = self.default_color
+            self.check_box_div.remove_widget(self.check_mark)
             _regions.remove(self.region_name)
             if not self.parent.app.selected_regions:
                 self.parent.app.region_selected = False
 
-        Animation(
-            color=_to_color,
-            d=0.3,
-        ).start(self)
+        self.animation.start(self)
 
 
 class RegionsChips(StackLayout):
@@ -204,21 +220,29 @@ class RootWidget(BoxLayout):
     stack_box_layout: BoxLayout = ObjectProperty(None)
 
 
-class SaveAsContent(BoxLayout):
+class SaveStackContent(BoxLayout):
     pass
 
 
-class LoadFromContent(BoxLayout):
+class RemoveSavedStack(ILeftBodyTouch, ButtonBehavior, Image):
+    pass
+
+
+class LoadStackContent(BoxLayout):
+    container: MDList = ObjectProperty(None)
+
+
+class StackLoadOption(TwoLineAvatarListItem):
     pass
 
 
 class View(MDApp):
     model: Model
     root: RootWidget
+
     save_as_dialog: MDDialog = None
     load_from_dialog: MDDialog = None
-    load_from_options: RecycleView
-    save_stack_field: MDTextField
+    load_from_content: LoadStackContent
 
     TITLE = 'Sam'
     session_manager: SessionManager
@@ -249,6 +273,7 @@ class View(MDApp):
         self.food_cards: Dict[str, FoodCard] = dict()
         self.selected_regions: Set[str] = set()
         self.dat_dir = Path(os.path.expanduser("~/Desktop/Sam/Preferences"))
+        self.load_from_options: Dict[str, StackLoadOption] = {}
         super().__init__(**kwargs)
 
     def on_start(self, *args) -> None:
@@ -258,9 +283,11 @@ class View(MDApp):
         with log.timer('Config read on startup'):
             self.model = Model(**__RESOURCE__.cfg('app.yml', parse=True))
             self.build_obj = Build(**__RESOURCE__.cfg('build.yml', parse=True))
+
             self.session_manager = model.Database(
                 db.Schema, f'sqlite:///{__RESOURCE__.db(self.model.CONNECTION_STRING_SUFFIX)}'
             ).connect(log.spawn('Database'))
+
             with self.session_manager() as session:
                 self.regions_d: Dict[str, db.Region] = db.Region.all(session)
                 self.root.regions_chips.add_regions(list(sorted(self.regions_d.keys(), reverse=True)))
@@ -268,10 +295,14 @@ class View(MDApp):
         try:
             # noinspection PyUnresolvedReferences
             import pyi_splash
+
         except ImportError:
             pass
+
         else:
             pyi_splash.close()
+
+        self.root.search_bar.clear_field()
 
     def build(self):
         self.theme_cls.colors = THEME
@@ -284,7 +315,7 @@ class View(MDApp):
     def start_snack_bar(text: str, icon: str = "information-outline") -> None:
         CustomSnackBar(text=text, icon=icon).open()
 
-    def add_food(self, value: db.Food = None, multiple_values: Set[db.Food] = None) -> None:
+    def add_food(self, value: db.Food = None, multiple_values: List[db.Food] = None) -> None:
         is_tail_recursion = multiple_values is not None
         if is_tail_recursion and value is not None:
             raise TypeError
@@ -297,7 +328,7 @@ class View(MDApp):
                 self.start_snack_bar(f'Food ID {food.food_id} is already in the stack')
 
         else:
-            food_card = FoodCard(food=food)
+            food_card = FoodCard(food=food, validated_qty=getattr(food, 'validated_qty', 1.0))
             self.stack[food.food_id] = food
             self.food_cards[food.food_id] = food_card
             self.root.stack_box_layout.add_widget(food_card)
@@ -319,6 +350,8 @@ class View(MDApp):
 
         else:
             self.root.search_bar.clear_field()
+
+        self.root.search_bar.clear_field()
 
         self.stack_present = bool(self.stack)
 
@@ -345,74 +378,128 @@ class View(MDApp):
         log.info('clear_food_cards button pressed')
         self.remove_from_stack(*self.food_cards.values())
 
+        def callback(*_) -> None:
+            self.root.search_bar.clear_field()
+
+        Clock.schedule_once(callback, .1)
+
     def load_stack(self) -> None:
         log.info('load_stack button pressed')
         if not self.dat_dir.exists():
             return self.start_snack_bar('No stacks have been saved so far.')
 
-        data = [dict(
-            file_name=stack.stem, last_modified=datetime.datetime
-                .fromtimestamp(stack.lstat().st_ctime)
-                .strftime('%m/%d/%Y'),
-        ) for stack in self.dat_dir.iterdir() if stack.suffix == '.stack']
+        data = [{'text': stack.stem, 'secondary_text': datetime.datetime.fromtimestamp(
+            stack.lstat().st_ctime
+        ).strftime('%m/%d/%Y')
+                 } for stack in self.dat_dir.iterdir() if stack.suffix == '.stack']
+
         if not data:
             return self.start_snack_bar('No stacks have been saved so far.')
 
+        data.sort(key=itemgetter('text'))
         if not self.load_from_dialog:
-            content = LoadFromContent()
-            self.load_from_options: RecycleView = content.load_from_options
+
+            self.load_from_content = LoadStackContent()
             self.load_from_dialog = MDDialog(
                 title="Load Stack",
                 type="custom",
-                content_cls=content,
-                buttons=[
-                    MDFlatButton(
-                        text="CANCEL", text_color=self.theme_cls.primary_color,
-                        on_press=lambda *args: self.load_from_dialog.dismiss(),
-                    ),
-                ],
+                content_cls=self.load_from_content,
+                items=[], buttons=[],
+                on_dismiss=self.root.search_bar.clear_field,
             )
 
-        @mainthread
-        def callback(*_) -> None:
-            self.load_from_options.data = data
+        self.load_from_content.container.clear_widgets()
+        self.load_from_options.clear()
+        for stack in self.dat_dir.iterdir():
+            if stack.suffix == '.stack':
+                option = StackLoadOption(text=stack.stem, secondary_text=datetime.datetime
+                                         .fromtimestamp(stack.lstat().st_ctime)
+                                         .strftime('%m/%d/%Y'), )
+                self.load_from_options[stack.stem] = option
+                self.load_from_content.container.add_widget(option)
+
         self.load_from_dialog.open()
-        callback()
 
-    def save_stack(self) -> None:
-        if not self.save_as_dialog:
-            content = SaveAsContent()
-            self.save_stack_field = content.input_field
-            self.save_as_dialog = MDDialog(
-                title="Save Stack",
-                type="custom",
-                content_cls=content,
-                buttons=[
-                    MDFlatButton(
-                        text="CANCEL", text_color=self.theme_cls.primary_color,
-                        on_press=lambda *args: self.save_as_dialog.dismiss(),
-                    ),
-                    MDFlatButton(
-                        text="OK", text_color=self.theme_cls.primary_color,
-                        on_press=lambda *args: self.save_stack_file_name(),
-                    ),
-                ],
-            )
-        self.save_as_dialog.open()
-        log.info('save_stack button pressed')
+    def remove_saved_stack(self, file_stem: str) -> None:
+        """
+        remove stack file and remove list item from view
+        """
+        destination = self.dat_dir / f'{file_stem}.stack'
+        if destination.exists():
+            # noinspection PyBroadException
+            try:
+                os.remove(destination)
+            except Exception:
+                self.load_from_dialog.dismiss()
+                self.start_snack_bar(f'failed to remove stack `{file_stem}`')
+                return log.error(f'failed to remove stack `{file_stem}`')
 
-    def load_stack_file_name(self, file_name: str) -> None:
+        option = self.load_from_options.pop(file_stem)
+        self.load_from_content.container.remove_widget(option)
+        if not self.load_from_options:
+            self.load_from_dialog.dismiss()
+
+        log.info(f'load_stack_file_name was called with `{file_stem}`')
+
+    def load_stack_from_file_name(self, file_stem: str) -> None:
         self.load_from_dialog.dismiss()
-        log.info(f'load_stack_file_name was called with `{file_name}`')
-
-    def save_stack_file_name(self) -> None:
-        self.save_as_dialog.dismiss()
-        file_stem, self.save_stack_field.text = self.save_stack_field.text, ''
-        os.makedirs(self.dat_dir, exist_ok=True)
         file_name = f'{file_stem}.stack'
         destination = self.dat_dir / file_name
         if destination.exists():
-            return self.start_snack_bar(f'"{file_name}" already exists.')
+            # noinspection PyBroadException
+            try:
+                items = {}
+                with open(destination, 'r', newline='') as wf:
+                    reader = csv.DictReader(wf, fieldnames=['food_id', 'validated_qty'])
+                    for item in reader:
+                        items[str(item['food_id'])] = item['validated_qty']
+
+                with self.session_manager() as session:
+                    # noinspection PyUnresolvedReferences
+                    foods: List[db.Food] = session.query(db.Food) \
+                        .filter(db.Food.food_id.in_(items.keys())) \
+                        .all()
+                for food in foods:
+                    food.validated_qty = items[food.food_id]
+
+                foods.reverse()
+                self.add_food(multiple_values=foods)
+
+            except Exception:
+                log.error(f'Failed to load stack `{file_stem}`')
+                os.remove(destination)
+                return self.start_snack_bar(f'"{file_stem}" is not a valid stack name.')
+
+        log.info(f'load_stack_file_name was called with `{file_stem}`')
+
+    def save_stack(self) -> None:
+        if not self.save_as_dialog:
+            content = SaveStackContent()
+
+            @mainthread
+            def callback(*_) -> None:
+                content.input_field.focus = True
+
+            self.save_as_dialog = MDDialog(
+                title="Save Stack As",
+                type="custom",
+                content_cls=content,
+                buttons=[],
+                on_open=callback,
+                on_dismiss=self.root.search_bar.clear_field,
+            )
+
+        self.save_as_dialog.content_cls.input_field.text = ''
+        self.save_as_dialog.open()
+
+    def save_stack_to_file_name(self, file_stem: str) -> None:
+        self.save_as_dialog.dismiss()
+        os.makedirs(self.dat_dir, exist_ok=True)
+        file_name = f'{file_stem}.stack'
+        destination = self.dat_dir / file_name
+
+        if destination.exists():
+            return self.start_snack_bar(f'stack "{file_stem}" already exists.')
 
         else:
             # noinspection PyBroadException
@@ -426,9 +513,6 @@ class View(MDApp):
 
             except Exception:
                 return self.start_snack_bar(f'"{file_stem}" is not a valid stack name.')
-
-        self.start_snack_bar(f'stack saved as "{file_stem}"')
-
 
     def begin_analysis(self) -> None:
         with self.session_manager() as session:
