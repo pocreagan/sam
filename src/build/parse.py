@@ -201,11 +201,11 @@ class Parser:
             db_future = self.threads.submit(self.init_database, connection_string)
 
             model: Model = self.parse_dat(resolve(dat_future))
-            # usda_future = self.threads.submit(self.get_usda_data, usda_url, model) todo
-
+            # usda_future = self.threads.submit(self.get_usda_data, usda_url, model)
+            
             self.parse_agile(resolve(agile_future), model)
 
-            # resolve(usda_future) todo
+            # resolve(usda_future)
 
             resolve(db_future)
             self.persist_records()
