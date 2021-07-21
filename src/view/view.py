@@ -11,7 +11,6 @@ from kivy.animation import Animation
 from kivy.clock import Clock
 from kivy.clock import mainthread
 from kivy.core.window import Window
-from kivy.input import MotionEvent
 from kivy.lang import Builder
 from kivy.properties import BooleanProperty
 from kivy.properties import ColorProperty
@@ -28,8 +27,6 @@ from kivy.uix.stacklayout import StackLayout
 from kivymd.app import MDApp
 from kivymd.uix.boxlayout import MDBoxLayout
 from kivymd.uix.dialog import MDDialog
-from kivymd.uix.list import IconLeftWidget
-from kivymd.uix.list import ILeftBodyTouch
 from kivymd.uix.list import MDList
 from kivymd.uix.list import TwoLineAvatarListItem
 # noinspection PyProtectedMember
@@ -134,10 +131,9 @@ class CustomSnackBar(BaseSnackbar):
     text = StringProperty(None)
     icon = StringProperty(None)
 
-    def dismiss_now(self, *args):
-        """Dismiss the snackbar."""
+    def dismiss_now(self, *_args):
 
-        def dismiss(interval):
+        def dismiss(_interval):
             if self.snackbar_animation_dir == "Top":
                 anim = Animation(y=(Window.height + self.height), d=0.2)
             elif self.snackbar_animation_dir == "Left":
@@ -147,9 +143,7 @@ class CustomSnackBar(BaseSnackbar):
             else:
                 anim = Animation(y=-self.height, d=0.2)
 
-            anim.bind(
-                on_complete=lambda *args: Window.parent.remove_widget(self)
-            )
+            anim.bind(on_complete=lambda *args: Window.parent.remove_widget(self))
             anim.start(self)
 
         Clock.schedule_once(dismiss, 0.)
@@ -376,9 +370,6 @@ class View(MDApp):
                 self.add_food(multiple_values=multiple_values)
 
             Clock.schedule_once(callback, .1)
-
-        else:
-            self.root.search_bar.clear_field()
 
         self.root.search_bar.clear_field()
 
