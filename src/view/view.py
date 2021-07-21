@@ -1,8 +1,6 @@
-import csv
 import datetime
 import os
 import time
-from operator import itemgetter
 from pathlib import Path
 from typing import Dict
 from typing import List
@@ -44,6 +42,7 @@ from src.base import loggers
 from src.controller import spreadsheet_out
 from src.model import db
 from src.model import SessionManager
+from src.model import stacks
 from src.model.config import Build
 from src.model.config import Model
 from src.view.palette import *
@@ -246,6 +245,7 @@ class View(MDApp):
 
     TITLE = 'Sam'
     session_manager: SessionManager
+    stack_session_manager: SessionManager
     regions_d: Dict[str, db.Region]
     model: Model
     build_obj: Build
@@ -276,6 +276,7 @@ class View(MDApp):
         self.selected_regions: Set[str] = set()
         self.dat_dir = Path(os.path.expanduser("~/Desktop/Sam/Preferences"))
         self.load_from_options: Dict[str, StackLoadOption] = {}
+        self.saved_stacks: Dict[str, stacks.Stack] = {}
         super().__init__(**kwargs)
 
     def on_start(self, *args) -> None:
@@ -293,6 +294,19 @@ class View(MDApp):
             with self.session_manager() as session:
                 self.regions_d: Dict[str, db.Region] = db.Region.all(session)
                 self.root.regions_chips.add_regions(list(sorted(self.regions_d.keys(), reverse=True)))
+
+            self.stack_session_manager = model.Database(
+                stacks.Schema, f'sqlite:///{self.dat_dir / "saved-stacks.db"}'
+            ).connect(log.spawn('StacksDB'))
+
+            with self.stack_session_manager() as stack_session:
+                # noinspection PyProtectedMember
+                results = stack_session.query(stacks.Stack).order_by(stacks.Stack.name).all()
+
+            self.saved_stacks = {r.name: r for r in results}
+            self.load_from_options = {name: StackLoadOption(
+                text=name, secondary_text=stack.created_at.strftime('%m/%d/%Y')
+            ) for name, stack in self.saved_stacks.items()}
 
         try:
             # noinspection PyUnresolvedReferences
@@ -385,22 +399,13 @@ class View(MDApp):
 
         Clock.schedule_once(callback, .1)
 
-    def load_stack(self) -> None:
+    def select_stack_dialog(self) -> None:
         log.info('load_stack button pressed')
-        if not self.dat_dir.exists():
+
+        if not self.saved_stacks:
             return self.start_snack_bar('No stacks have been saved so far.')
 
-        data = [{'text': stack.stem, 'secondary_text': datetime.datetime.fromtimestamp(
-            stack.lstat().st_ctime
-        ).strftime('%m/%d/%Y')
-                 } for stack in self.dat_dir.iterdir() if stack.suffix == '.stack']
-
-        if not data:
-            return self.start_snack_bar('No stacks have been saved so far.')
-
-        data.sort(key=itemgetter('text'))
         if not self.load_from_dialog:
-
             self.load_from_content = LoadStackContent()
             self.load_from_dialog = MDDialog(
                 title="Load Stack",
@@ -411,70 +416,12 @@ class View(MDApp):
             )
 
         self.load_from_content.container.clear_widgets()
-        self.load_from_options.clear()
-        for stack in self.dat_dir.iterdir():
-            if stack.suffix == '.stack':
-                option = StackLoadOption(text=stack.stem, secondary_text=datetime.datetime
-                                         .fromtimestamp(stack.lstat().st_ctime)
-                                         .strftime('%m/%d/%Y'), )
-                self.load_from_options[stack.stem] = option
-                self.load_from_content.container.add_widget(option)
+        for _, option in self.load_from_options.items():
+            self.load_from_content.container.add_widget(option)
 
         self.load_from_dialog.open()
 
-    def remove_saved_stack(self, file_stem: str) -> None:
-        """
-        remove stack file and remove list item from view
-        """
-        destination = self.dat_dir / f'{file_stem}.stack'
-        if destination.exists():
-            # noinspection PyBroadException
-            try:
-                os.remove(destination)
-            except Exception:
-                self.load_from_dialog.dismiss()
-                self.start_snack_bar(f'failed to remove stack `{file_stem}`')
-                return log.error(f'failed to remove stack `{file_stem}`')
-
-        option = self.load_from_options.pop(file_stem)
-        self.load_from_content.container.remove_widget(option)
-        if not self.load_from_options:
-            self.load_from_dialog.dismiss()
-
-        log.info(f'load_stack_file_name was called with `{file_stem}`')
-
-    def load_stack_from_file_name(self, file_stem: str) -> None:
-        self.load_from_dialog.dismiss()
-        file_name = f'{file_stem}.stack'
-        destination = self.dat_dir / file_name
-        if destination.exists():
-            # noinspection PyBroadException
-            try:
-                items = {}
-                with open(destination, 'r', newline='') as wf:
-                    reader = csv.DictReader(wf, fieldnames=['food_id', 'validated_qty'])
-                    for item in reader:
-                        items[str(item['food_id'])] = item['validated_qty']
-
-                with self.session_manager() as session:
-                    # noinspection PyUnresolvedReferences
-                    foods: List[db.Food] = session.query(db.Food) \
-                        .filter(db.Food.food_id.in_(items.keys())) \
-                        .all()
-                for food in foods:
-                    food.validated_qty = items[food.food_id]
-
-                foods.reverse()
-                self.add_food(multiple_values=foods)
-
-            except Exception:
-                log.error(f'Failed to load stack `{file_stem}`')
-                os.remove(destination)
-                return self.start_snack_bar(f'"{file_stem}" is not a valid stack name.')
-
-        log.info(f'load_stack_file_name was called with `{file_stem}`')
-
-    def save_stack(self) -> None:
+    def update_stack_dialog(self) -> None:
         if not self.save_as_dialog:
             content = SaveStackContent()
 
@@ -494,27 +441,51 @@ class View(MDApp):
         self.save_as_dialog.content_cls.input_field.text = ''
         self.save_as_dialog.open()
 
-    def save_stack_to_file_name(self, file_stem: str) -> None:
+    def select_stack(self, stack_name: str) -> None:
+        self.load_from_dialog.dismiss()
+        items = self.saved_stacks[stack_name].foods
+
+        with self.session_manager() as session:
+            # noinspection PyUnresolvedReferences
+            foods: List[db.Food] = session.query(db.Food) \
+                .filter(db.Food.food_id.in_(items.keys())) \
+                .all()
+
+        for food in foods:
+            food.validated_qty = items[food.food_id]
+
+        _foods = {food.food_id: food for food in foods}
+        foods = [_foods[k] for k in items.keys()]
+        foods.reverse()
+        self.add_food(multiple_values=foods)
+
+        log.info(f'selected stack `{stack_name}`')
+
+    def delete_stack(self, stack_name: str) -> None:
+        with self.stack_session_manager() as session:
+            session.query(stacks.Stack).filter_by(id=self.saved_stacks.pop(stack_name).id).delete()
+
+        self.load_from_content.container.remove_widget(self.load_from_options.pop(stack_name))
+        if not self.load_from_options:
+            self.load_from_dialog.dismiss()
+
+        log.info(f'deleted stack `{stack_name}`')
+
+    def update_stack(self, stack_name: str) -> None:
         self.save_as_dialog.dismiss()
-        os.makedirs(self.dat_dir, exist_ok=True)
-        file_name = f'{file_stem}.stack'
-        destination = self.dat_dir / file_name
+        if stack_name in self.saved_stacks:
+            self.delete_stack(stack_name)
 
-        if destination.exists():
-            return self.start_snack_bar(f'stack "{file_stem}" already exists.')
+        with self.stack_session_manager() as session:
+            self.saved_stacks[stack_name] = session.make(stacks.Stack(name=stack_name, foods={
+                card.food.food_id: float(card.validated_qty) for card in self.food_cards.values()
+            }))
 
-        else:
-            # noinspection PyBroadException
-            try:
-                with open(destination, 'w+', newline='') as wf:
-                    writer = csv.DictWriter(wf, fieldnames=['food_id', 'validated_qty'])
-                    writer.writeheader()
-                    writer.writerows([dict(
-                        food_id=card.food.food_id, validated_qty=float(card.validated_qty)
-                    ) for card in self.food_cards.values()])
+            self.load_from_options[stack_name] = StackLoadOption(
+                text=stack_name, secondary_text=self.saved_stacks[stack_name].created_at.strftime('%m/%d/%Y')
+            )
 
-            except Exception:
-                return self.start_snack_bar(f'"{file_stem}" is not a valid stack name.')
+        log.info(f'updated stack `{stack_name}`')
 
     def begin_analysis(self) -> None:
         with self.session_manager() as session:

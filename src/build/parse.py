@@ -202,7 +202,7 @@ class Parser:
 
             model: Model = self.parse_dat(resolve(dat_future))
             # usda_future = self.threads.submit(self.get_usda_data, usda_url, model)
-            
+
             self.parse_agile(resolve(agile_future), model)
 
             # resolve(usda_future)

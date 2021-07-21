@@ -243,17 +243,17 @@
         hint_text: "Name"
         multiline: False
         selection_color: herbalife_green
-        on_text_validate: app.save_stack_to_file_name(self.text)
+        on_text_validate: app.update_stack(self.text)
 
 
 <StackLoadOption>:
-    on_release: app.load_stack_from_file_name(root.text)
+    on_release: app.select_stack(root.text)
     _no_ripple_effect: True
     # IconLeftWidget:
     #     icon: 'trash-can-outline'
     RemoveSavedStack:
         source: 'reset-trans.png'
-        on_press: app.remove_saved_stack(root.text)
+        on_press: app.delete_stack(root.text)
 
 <LoadStackContent>:
     container: container
@@ -387,7 +387,7 @@
                             disabled: app.stack_present
                             enabled: not self.disabled
                             source: 'load.png' if self.enabled else 'load-grey.png'
-                            on_press: app.load_stack()
+                            on_press: app.select_stack_dialog()
                         ClickButton:
                             disabled: not app.stack_present
                             enabled: not self.disabled
@@ -397,7 +397,7 @@
                             disabled: not app.stack_present
                             enabled: not self.disabled
                             source: 'save.png' if self.enabled else 'save-grey.png'
-                            on_press: app.save_stack()
+                            on_press: app.update_stack_dialog()
                         ClickButton:
                             disabled: not (app.stack_present and app.region_selected)
                             enabled: not self.disabled
