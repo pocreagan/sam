@@ -1,5 +1,8 @@
+import csv
 import datetime
+import os
 import time
+from pathlib import Path
 from typing import Dict
 from typing import List
 from typing import Set
@@ -18,21 +21,17 @@ from kivy.properties import StringProperty
 from kivy.uix.behaviors import ButtonBehavior
 from kivy.uix.boxlayout import BoxLayout
 from kivy.uix.floatlayout import FloatLayout
+from kivy.uix.image import Image
 from kivy.uix.label import Label
-from kivy.uix.screenmanager import NoTransition
-from kivy.uix.screenmanager import Screen
-from kivy.uix.screenmanager import ScreenManager
+from kivy.uix.recycleview import RecycleView
 from kivy.uix.scrollview import ScrollView
 from kivy.uix.stacklayout import StackLayout
-from kivy.utils import get_color_from_hex
 from kivymd.app import MDApp
 from kivymd.uix.boxlayout import MDBoxLayout
-from kivymd.uix.card import MDCard
-from kivymd.uix.label import MDLabel
 # noinspection PyProtectedMember
+from kivymd.uix.dialog import MDDialog
 from kivymd.uix.snackbar import BaseSnackbar
 from kivymd.uix.textfield import MDTextField
-from kivymd.utils.fitimage import FitImage
 from KivyOnTop import register_topmost
 
 from src import __RESOURCE__
@@ -53,30 +52,22 @@ __all__ = [
 log = loggers.Logger('View', Logger)
 
 
-class TopBar(FitImage):
-    source = StringProperty('Sam header.png')
-
-
-class USDASourceButton(Label):
-    parent: BoxLayout = ObjectProperty(None)
+class RemoveFoodButton(Image):
+    parent: FloatLayout = ObjectProperty(None)
 
     def on_touch_down(self, touch: MotionEvent) -> bool:
         if self.collide_point(*touch.pos):
-            if touch.is_double_tap:
-                Clock.schedule_interval(self.parent.root.shrink, .003)
+            self.parent.parent.root.kill()
 
         return super().on_touch_down(touch)
 
 
-class HerbalifeSourceButton(FloatLayout):
-    parent: BoxLayout = ObjectProperty(None)
+class SourceLogo(FloatLayout):
+    pass
 
-    def on_touch_down(self, touch: MotionEvent) -> bool:
-        if self.collide_point(*touch.pos):
-            if touch.is_double_tap:
-                Clock.schedule_interval(self.parent.root.shrink, .003)
 
-        return super().on_touch_down(touch)
+class SourceLogoRemovable(SourceLogo):
+    pass
 
 
 class FoodQTYField(MDTextField):
@@ -127,50 +118,19 @@ class FoodQTYField(MDTextField):
         super().on_focus(_arg, is_focused)
 
 
-class FoodCard(MDCard):
-    food_id = StringProperty('Food ID')
-    description = StringProperty('Food Description')
-    serving_size = StringProperty('Serving Size')
-    source: FoodSource = ObjectProperty(None)
-    first = True
-
+class FoodCard(BoxLayout):
+    food: db.Food = ObjectProperty(None)
     app: 'View' = ObjectProperty(None)
     qty_field: FoodQTYField = ObjectProperty(None)
-    description_label: MDLabel = ObjectProperty(None)
-    food_source_div: BoxLayout = ObjectProperty(None)
-
-    height_decrement_qty: float
-    char_lookup: Dict[str, int]
 
     def __init__(self, **kwargs) -> None:
-        self.validated_qty = 1.0
+        self.validated_qty = kwargs.get('validated_qty', 1.0)
         super().__init__(**kwargs)
 
-    def on_kv_post(self, base_widget):
-        if type(self).first:
-            type(self).height_decrement_qty = self.height / 20
-            type(self).first = False
-        self.add_logo()
-
     @mainthread
-    def add_logo(self) -> None:
-        if self.source == FoodSource.USDA:
-            self.food_source_div.add_widget(USDASourceButton())
-        elif self.source == FoodSource.HLF:
-            self.food_source_div.add_widget(HerbalifeSourceButton())
-
-    def shrink(self, *_) -> None:
-        if self.children:
-            self.clear_widgets()
-            self.md_bg_color = get_color_from_hex('#fafafa')
-
-        self.height -= self.height_decrement_qty
-        if self.height > self.height_decrement_qty:
-            self.app.recalculate_scroll_view()
-
-        else:
-            Clock.unschedule(self.shrink)
-            self.app.remove_from_stack(self)
+    def kill(self, *_) -> None:
+        self.clear_widgets()
+        self.app.remove_from_stack(self)
 
 
 class CustomSnackBar(BaseSnackbar):
@@ -178,41 +138,12 @@ class CustomSnackBar(BaseSnackbar):
     icon = StringProperty(None)
 
 
-class LoadingScreen(Screen):
-    label_text: str = StringProperty('loading...')
-    is_good: bool = BooleanProperty(True)
-    is_loading: bool = BooleanProperty(True)
-
-    def set(self, label_text: str, is_good: bool, is_loading: bool) -> None:
-        self.label_text = label_text
-        self.is_good = is_good
-        self.is_loading = is_loading
-
-
-class EmptyStackScreen(Screen):
-    input_field: MDTextField = ObjectProperty(None)
-
-    def on_enter(self, *args):
-        def callback(*_) -> None:
-            log.info('giving input field focus now')
-            self.input_field.focus = True
-
-        super().on_enter(*args)
-        Clock.schedule_once(callback, .1)
-
-
-class PopulatedStackScreen(Screen):
-    input_field: MDTextField = ObjectProperty(None)
-    food_scroll_view: ScrollView = ObjectProperty(None)
-    food_stack_layout: StackLayout = ObjectProperty(None)
-
-
 class CheckMark(BoxLayout):
     pass
 
 
 class RegionChip(ButtonBehavior, BoxLayout):
-    parent: StackLayout
+    parent: 'RegionsChips'
     selected = BooleanProperty(False)
     selected_color = ColorProperty([0, 0, 0, 0])
     default_color = ColorProperty([0, 0, 0, 0])
@@ -223,18 +154,18 @@ class RegionChip(ButtonBehavior, BoxLayout):
 
     def on_press(self) -> None:
         self.selected = not self.selected
-        _regions = self.parent.root.selected_regions
+        _regions = self.parent.app.selected_regions
         if self.selected:
             _regions.add(self.region_name)
             _to_color = self.selected_color
             self.check_box_div.add_widget(CheckMark())
-            self.parent.root.selection_made = True
+            self.parent.app.region_selected = True
         else:
             self.check_box_div.clear_widgets()
             _to_color = self.default_color
             _regions.remove(self.region_name)
-            if not self.parent.root.selected_regions:
-                self.parent.root.selection_made = False
+            if not self.parent.app.selected_regions:
+                self.parent.app.region_selected = False
 
         Animation(
             color=_to_color,
@@ -242,60 +173,45 @@ class RegionChip(ButtonBehavior, BoxLayout):
         ).start(self)
 
 
-# noinspection PyAbstractClass
-class SubmitInstruction(ButtonBehavior, MDLabel):
-    root: 'AnalysisScreen' = ObjectProperty(None)
-
-    def on_press(self) -> bool:
-        if self.root.selection_made:
-            self.root.begin_analysis()
-            return True
-
-        return super().on_press()
-
-
-class AnalysisScreen(Screen):
+class RegionsChips(StackLayout):
     app: 'View' = ObjectProperty(None)
-    chip_stack: StackLayout = ObjectProperty(None)
-    chip_interval = .05
-    regions_to_be_added: List[str]
-    selected_regions: Set[str]
-    selection_made = BooleanProperty(False)
-    submit_instruction: SubmitInstruction = ObjectProperty(None)
 
-    def begin_analysis(self) -> None:
-        log.info(f'Beginning analysis')
-        self.app.begin_analysis(self.selected_regions)
+    def add_regions(self, regions: List[str]):
+        [self.add_widget(RegionChip(region_name=region)) for region in regions]
 
-    def on_enter(self, *args):
-        self.regions_to_be_added = list(self.app.regions_d.keys())
-        self.selected_regions = set()
-        Clock.schedule_interval(self.add_chip, self.chip_interval)
 
-    def add_chip(self, *_) -> None:
-        self.chip_stack.add_widget(RegionChip(region_name=self.regions_to_be_added.pop()))
-        if not self.regions_to_be_added:
-            Clock.unschedule(self.add_chip)
+class ClickButton(ButtonBehavior, Image):
+    pass
+
+
+class SearchResult(BoxLayout):
+    food: db.Food = ObjectProperty(None)
+
+
+class SearchBar(MDTextField):
+    @mainthread
+    def clear_field(self, do_clear_text: bool = True) -> None:
+        if do_clear_text:
+            self.text = ''
+        self.focus = True
 
 
 class RootWidget(BoxLayout):
-    bottom_bar: BoxLayout = ObjectProperty(None)
+    regions_chips: RegionsChips = ObjectProperty(None)
+    search_bar: SearchBar = ObjectProperty(None)
+    search_results: RecycleView = ObjectProperty(None)
+    stack_scroll_view: ScrollView = ObjectProperty(None)
+    stack_box_layout: BoxLayout = ObjectProperty(None)
+
+
+class SaveAsContent(BoxLayout):
+    pass
 
 
 class View(MDApp):
     model: Model
-
     root: RootWidget
-    screen_manager: ScreenManager
-
-    loading_screen: LoadingScreen
-    empty_stack_screen: EmptyStackScreen
-    populated_stack_screen: PopulatedStackScreen
-
-    food_stack_layout: StackLayout
-    food_scroll_view: ScrollView
-
-    analysis_screen: AnalysisScreen
+    save_as_dialog: MDDialog = None
 
     TITLE = 'Sam'
     session_manager: SessionManager
@@ -303,10 +219,29 @@ class View(MDApp):
     model: Model
     build_obj: Build
 
+    region_selected = BooleanProperty(False)
+    stack_present = BooleanProperty(False)
+
+    def search_term_change(self, term: str) -> None:
+        stripped, results = term.strip(), []
+        for term in term.split():
+            if len(term) > 3:
+                with self.session_manager() as session:
+                    results = [dict(food=f) for f in db.Food.search(session, stripped)]
+                    break
+
+        self.root.search_results.data = results
+
+    def search_term_enter(self) -> None:
+        if len(self.root.search_results.data) == 1:
+            self.add_food(self.root.search_results.data[0]['food'])
+
     def __init__(self, **kwargs) -> None:
         kwargs['title'] = type(self).TITLE
         self.stack: Dict[str, db.Food] = dict()
         self.food_cards: Dict[str, FoodCard] = dict()
+        self.selected_regions: Set[str] = set()
+        self.dat_dir = Path(os.path.expanduser("~/Desktop/Sam/Preferences"))
         super().__init__(**kwargs)
 
     def on_start(self, *args) -> None:
@@ -321,96 +256,52 @@ class View(MDApp):
             ).connect(log.spawn('Database'))
             with self.session_manager() as session:
                 self.regions_d: Dict[str, db.Region] = db.Region.all(session)
+                self.root.regions_chips.add_regions(list(sorted(self.regions_d.keys(), reverse=True)))
 
         try:
             # noinspection PyUnresolvedReferences
             import pyi_splash
-            pyi_splash.close()
         except ImportError:
             pass
+        else:
+            pyi_splash.close()
 
     def build(self):
         self.theme_cls.colors = THEME
         self.theme_cls.primary_palette = PRIMARY_PALETTE
         self.theme_cls.accent_palette = 'Orange'
-
-        self.root = Builder.load_file(__RESOURCE__.cfg('view.kv'))
-
-        self.screen_manager = ScreenManager(transition=NoTransition())
-        self.loading_screen = LoadingScreen(name='loading')
-        self.empty_stack_screen = EmptyStackScreen(name='empty_stack')
-        self.populated_stack_screen = PopulatedStackScreen(name='populated_stack')
-
-        self.food_stack_layout = self.populated_stack_screen.food_stack_layout
-        self.food_scroll_view = self.populated_stack_screen.food_scroll_view
-
-        self.analysis_screen = AnalysisScreen(name='analysis')
-
-        self.screen_manager.add_widget(self.loading_screen)
-        self.screen_manager.add_widget(self.empty_stack_screen)
-        self.screen_manager.add_widget(self.populated_stack_screen)
-        self.screen_manager.add_widget(self.analysis_screen)
-        self.root.bottom_bar.add_widget(self.screen_manager)
-
-        self.screen_manager.current = 'populated_stack'
-        self.screen_manager.current = 'empty_stack'
-
-        return self.root
+        return Builder.load_file(__RESOURCE__.cfg('view.kv'))
 
     @staticmethod
     @mainthread
     def warning_snack_bar(text: str, icon: str = "information-outline") -> None:
         CustomSnackBar(text=text, icon=icon).open()
 
-    @mainthread
-    def clear_field(self, do_clear_text: bool = True) -> None:
-        if do_clear_text:
-            self.screen_manager.current_screen.input_field.text = ''
-        self.screen_manager.current_screen.input_field.focus = True
-
-    def add_food(self, value: str = None, multiple_values: Set[str] = None) -> None:
+    def add_food(self, value: db.Food = None, multiple_values: Set[db.Food] = None) -> None:
         is_tail_recursion = multiple_values is not None
         if is_tail_recursion and value is not None:
             raise TypeError
 
-        food_id = (value if value is not None else multiple_values.pop()).upper().strip()  # type: ignore
+        food = value if value is not None else multiple_values.pop()
 
-        if not food_id:
-            return
-
-        if food_id in self.stack:
-            scroll_to_widget = self.food_cards[food_id]
+        if food.food_id in self.stack:
+            scroll_to_widget = self.food_cards[food.food_id]
             if not is_tail_recursion:
-                self.warning_snack_bar(f'Food ID {food_id} is already in the stack')
+                self.warning_snack_bar(f'Food ID {food.food_id} is already in the stack')
 
         else:
-            try:
-                with self.session_manager() as session:
-                    food = db.Food.get(session, food_id)
-                if food is None:
-                    raise ValueError
-
-            except (TypeError, ValueError):
-                self.clear_field(do_clear_text=False)
-                return self.warning_snack_bar(f'Food ID `{food_id}` was not found')
-
-            food_card = FoodCard()
-            food_card.food_id = food_id
-            food_card.description = food.description
-            food_card.serving_size = food.qty_per_serving
-            food_card.source = food.source
-            self.stack[food_id] = food
-            self.food_cards[food_id] = food_card
-            self.food_stack_layout.add_widget(food_card)
+            food_card = FoodCard(food=food)
+            self.stack[food.food_id] = food
+            self.food_cards[food.food_id] = food_card
+            self.root.stack_box_layout.add_widget(food_card)
             scroll_to_widget = food_card
 
-        @mainthread
-        def scroll_to_widget_callback(widget):
-            if self.food_stack_layout.height > self.food_scroll_view.height:
-                self.food_scroll_view.scroll_to(widget)
-
         if scroll_to_widget:
-            self.screen_manager.current = 'populated_stack'
+            @mainthread
+            def scroll_to_widget_callback(widget):
+                if self.root.stack_box_layout.height > self.root.stack_scroll_view.height:
+                    self.root.stack_scroll_view.scroll_to(widget)
+
             scroll_to_widget_callback(scroll_to_widget)
 
         if is_tail_recursion and multiple_values:
@@ -420,42 +311,72 @@ class View(MDApp):
             Clock.schedule_once(callback, .1)
 
         else:
-            self.clear_field()
+            self.root.search_bar.clear_field()
+
+        self.stack_present = bool(self.stack)
 
     @mainthread
     def recalculate_scroll_view(self) -> None:
-        if self.food_stack_layout.height < self.food_scroll_view.height:
-            self.food_scroll_view.scroll_y = 1.
+        if self.root.stack_box_layout.height < self.root.stack_scroll_view.height:
+            self.root.stack_scroll_view.scroll_y = 1.
 
-    def proceed_to_region_selection_screen(self) -> None:
-        log.info('proceed_to_region_selection_screen')
-        self.screen_manager.current = 'analysis'
+    @mainthread
+    def remove_from_stack(self, *food_cards: FoodCard) -> None:
+        for food_card in food_cards:
+            food_id = food_card.food.food_id
+            del self.stack[food_id]
+            del self.food_cards[food_id]
+
+            self.root.stack_box_layout.remove_widget(food_card)
+            log.info(f'Removed food `{food_id}` from stack')
+
+        self.root.search_bar.clear_field(False)
+        self.recalculate_scroll_view()
+        self.stack_present = bool(self.stack)
 
     def clear_food_cards(self) -> None:
         log.info('clear_food_cards button pressed')
         self.remove_from_stack(*self.food_cards.values())
 
-    @mainthread
-    def remove_from_stack(self, *food_cards: FoodCard) -> None:
-        for food_card in food_cards:
-            food_id = food_card.food_id
-            del self.stack[food_id]
-            del self.food_cards[food_id]
+    def load_stack(self) -> None:
+        log.info('load_stack button pressed')
 
-            self.food_stack_layout.remove_widget(food_card)
-            log.info(f'Removed food `{food_card.food_id}` from stack')
+    def save_stack(self) -> None:
+        if not self.save_as_dialog:
+            self.save_as_dialog = MDDialog(
+                text="",
+                type="custom",
+                content_cls=SaveAsContent(),
+            )
+        self.save_as_dialog.open()
+        log.info('save_stack button pressed')
 
-        if not self.stack:
-            self.screen_manager.current = 'empty_stack'
+    def save_stack_file_name(self) -> None:
+        file_name = self.save_as_dialog.input_field.text
+        destination = self.dat_dir / file_name
+        if destination.exists():
+            return self.warning_snack_bar(f'"{file_name}" already exists.')
 
-        self.clear_field()
-        self.recalculate_scroll_view()
+        else:
+            # noinspection PyBroadException
+            try:
+                with open(destination, 'w+') as wf:
+                    writer = csv.DictWriter(wf, fieldnames=['food_id', 'num_servings'])
+                    writer.writeheader()
+                    writer.writerows([dict(
+                        food_id=card.food.food_id, num_servings=float(card.validated_qty)
+                    ) for card in self.food_cards.values()])
 
-    def begin_analysis(self, regions: Set[str]) -> None:
+            except Exception:
+                return self.warning_snack_bar(f'"{file_name}" is not a valid stack name.')
+
+        self.warning_snack_bar(f'stack saved as "{file_name}"')
+
+    def begin_analysis(self) -> None:
         with self.session_manager() as session:
             spreadsheet_out.make(
                 db.Stack.from_gui(
-                    session, [self.regions_d[r] for r in regions], list(self.stack.values()),
+                    session, [self.regions_d[r] for r in self.selected_regions], list(self.stack.values()),
                     {k: v.validated_qty for k, v in self.food_cards.items()},
                 ).for_spreadsheet(self.build_obj.app_version),
                 f'Sam-{datetime.datetime.now().strftime("%Y%m%d-%H%M%S")}'

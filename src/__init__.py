@@ -55,5 +55,5 @@ __RESOURCE__ = Resource(source_dir)
 
 resource_add_path(__RESOURCE__.img())
 Config.read(__RESOURCE__.cfg('kivy_config.ini'))
-Config.set('kivy', 'window_icon', __RESOURCE__.img('favicon_white.ico'))
+Config.set('kivy', 'window_icon', __RESOURCE__.img('favicon.ico'))
 Config.write()

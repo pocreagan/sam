@@ -14,10 +14,12 @@ _THEME = {
         "100": "a3d47b",
         "200": "95cd69",
         "300": "88c756",
-        # "400": "7bc143",
-        # "500": "6fae3c",
-        "400": "abd55a",
-        "500": "abd55a",
+        "400": "7bc143",
+        "500": "7BC143",
+        # "400": "abd55a",
+        # "500": "abd55a",
+        # "400": "387C2B",
+        # "500": "387C2B",
         "600": "629a36",
         "700": "56872f",
         "800": "4a7428",
@@ -42,7 +44,15 @@ _THEME = {
         "A200": "32210a",
         "A400": "191105",
         "A700": "000000",
-    }
+    },
+    "Light": {
+        "StatusBar": "E0E0E0",
+        "AppBar": "F5F5F5",
+        "Background": "FAFAFA",
+        # "Background": "FFFFFF",
+        "CardsDialogs": "FFFFFF",
+        "FlatButtonDown": "cccccc",
+    },
 }
 colors.update(_THEME)
 THEME = colors.copy()

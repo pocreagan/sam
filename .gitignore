@@ -7,3 +7,4 @@
 /resources/cfg/build.yml
 *.py[cod]
 __pycache__
+/src/_notebook

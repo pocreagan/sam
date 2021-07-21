@@ -50,7 +50,7 @@ class Database:
         # noinspection PyUnresolvedReferences
         self.metadata = self.schema.metadata
 
-    def connect(self, logger, echo_sql: bool = False, drop_tables: bool = False, **_kwargs) -> SessionManager:
+    def connect(self, logger=None, echo_sql: bool = False, drop_tables: bool = False, **_kwargs) -> SessionManager:
         """
         sets up the sqlalchemy connection and declares a transaction factory context manager
         """
@@ -59,21 +59,24 @@ class Database:
         # noinspection PyUnresolvedReferences
         _connection = self.schema.connection_name
 
+        log = logger.debug if logger else print
+        warn = logger.warning if logger else print
+
         engine = sa.create_engine(self.conn_string, echo=echo_sql)
-        logger.debug(f'Created engine')
+        log(f'Created engine')
 
         session_constructor: Callable[[], Session_t] = sessionmaker(bind=engine, class_=Session_t)
-        logger.debug(f'Bound session constructor')
+        log(f'Bound session constructor')
 
         if drop_tables:
             # if input('ARE YOU SURE YOU WANT TO DROP TABLES? -> ').lower() != 'yes':
             #     exit(1)
 
             self.metadata.drop_all(engine)
-            logger.warning(f'Dropped tables')
+            warn(f'Dropped tables')
 
         self.metadata.create_all(engine)
-        logger.debug(f'Mapped schema')
+        log(f'Mapped schema')
 
         @contextmanager
         def session_manager_f(expire: bool = False) -> ContextManager[Session_t]:

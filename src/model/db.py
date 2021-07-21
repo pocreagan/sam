@@ -83,6 +83,29 @@ class Food(Schema):
     _qty_per_serving = Column(Float)
     _nutrient_data: 'NutrientData' = food_to_blob_relationship.parent
 
+    @classmethod
+    def search(cls, session: Session_t, term: str) -> List[int]:
+        first, last = term[0], term[-1]
+        split_terms = term.split()
+
+        q = session.query(cls)
+        if len(split_terms) == 1 and last.isdigit():
+            if first.upper() == 'F':
+                q = q.filter(cls.food_id == term.upper())
+            elif first.isdigit():
+                # noinspection PyUnresolvedReferences
+                q = q.filter(cls.food_id.ilike(f'{term}%'))
+            else:
+                return []
+
+        else:
+            # q = q.filter(cls.source==FoodSource.USDA)
+            for t in split_terms:
+                # noinspection PyUnresolvedReferences
+                q = q.filter(cls.description.ilike(f'%{t}%'))
+
+        return q.all()
+
     def set_id(self, pk: int, nut_pk: int) -> None:
         self.id = self._nutrient_data.food_id = pk
         self._nutrient_data.id = nut_pk

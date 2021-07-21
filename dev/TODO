@@ -10,3 +10,38 @@ BUGS
 
 FEATURES
 add dyn food id search
+
+#! BEFORE CHANGE: b6a6017
+
+
+logo, region chips
+left:
+    logo
+    tabs
+        STACKS
+            card for each saved stack
+                remove button
+                name
+                last modified
+                add button
+        SEARCH
+            card for each result
+                food id, qty / serving
+                description
+                add button
+
+right:
+    region chips
+        save last regions on Analyze
+        load last regions on startup
+    stack
+        card for each item
+            as before
+    buttons
+        all disabled if stack is empty
+        save button
+            open save modal to save stack to file
+        clear button
+            remove all items from stack
+        analyze button
+            open result spreadsheet
