@@ -201,10 +201,12 @@ class Parser:
             db_future = self.threads.submit(self.init_database, connection_string)
 
             model: Model = self.parse_dat(resolve(dat_future))
-            usda_future = self.threads.submit(self.get_usda_data, usda_url, model)
+            # usda_future = self.threads.submit(self.get_usda_data, usda_url, model) todo
+
             self.parse_agile(resolve(agile_future), model)
 
-            resolve(usda_future)
+            # resolve(usda_future) todo
+            
             resolve(db_future)
             self.persist_records()
 
@@ -219,7 +221,7 @@ class Parser:
         }} for food_id in model.usda.foods.keys()]
 
         log.debug(f'Requesting data from USDA Food Center...')
-        responses, exceptions = threaded.map(requests)
+        responses, exceptions = threaded.map(requests, num_processes=20)
 
         for e in exceptions:
             raise ParseFailure('HTTP exception') from e
