@@ -28,6 +28,7 @@ from kivy.uix.stacklayout import StackLayout
 from kivymd.app import MDApp
 from kivymd.uix.boxlayout import MDBoxLayout
 from kivymd.uix.dialog import MDDialog
+from kivymd.uix.list import IconLeftWidget
 from kivymd.uix.list import ILeftBodyTouch
 from kivymd.uix.list import MDList
 from kivymd.uix.list import TwoLineAvatarListItem
@@ -236,10 +237,6 @@ class RootWidget(BoxLayout):
 
 
 class SaveStackContent(BoxLayout):
-    pass
-
-
-class RemoveSavedStack(ILeftBodyTouch, ButtonBehavior, Image):
     pass
 
 

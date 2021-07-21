@@ -251,9 +251,10 @@
 <StackLoadOption>:
     on_release: app.select_stack(root.text)
     _no_ripple_effect: True
-    RemoveSavedStack:
-        source: 'reset-trans.png'
+    IconLeftWidget:
+        icon: 'trash-can-outline'
         on_press: app.delete_stack(root.text)
+
 
 <LoadStackContent>:
     container: container
