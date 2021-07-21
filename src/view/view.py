@@ -29,6 +29,7 @@ from kivy.uix.stacklayout import StackLayout
 from kivymd.app import MDApp
 from kivymd.uix.boxlayout import MDBoxLayout
 # noinspection PyProtectedMember
+from kivymd.uix.button import MDFlatButton
 from kivymd.uix.dialog import MDDialog
 from kivymd.uix.snackbar import BaseSnackbar
 from kivymd.uix.textfield import MDTextField
@@ -42,7 +43,6 @@ from src.model import db
 from src.model import SessionManager
 from src.model.config import Build
 from src.model.config import Model
-from src.model.enums import FoodSource
 from src.view.palette import *
 
 __all__ = [
@@ -93,7 +93,7 @@ class FoodQTYField(MDTextField):
                     raise ValueError
 
             except ValueError:
-                self.app.warning_snack_bar(f'`{self.text}` is not a valid QTY')
+                self.app.start_snack_bar(f'`{self.text}` is not a valid QTY')
                 self.text = str(self.root.validated_qty)
 
             else:
@@ -208,10 +208,17 @@ class SaveAsContent(BoxLayout):
     pass
 
 
+class LoadFromContent(BoxLayout):
+    pass
+
+
 class View(MDApp):
     model: Model
     root: RootWidget
     save_as_dialog: MDDialog = None
+    load_from_dialog: MDDialog = None
+    load_from_options: RecycleView
+    save_stack_field: MDTextField
 
     TITLE = 'Sam'
     session_manager: SessionManager
@@ -274,7 +281,7 @@ class View(MDApp):
 
     @staticmethod
     @mainthread
-    def warning_snack_bar(text: str, icon: str = "information-outline") -> None:
+    def start_snack_bar(text: str, icon: str = "information-outline") -> None:
         CustomSnackBar(text=text, icon=icon).open()
 
     def add_food(self, value: db.Food = None, multiple_values: Set[db.Food] = None) -> None:
@@ -287,7 +294,7 @@ class View(MDApp):
         if food.food_id in self.stack:
             scroll_to_widget = self.food_cards[food.food_id]
             if not is_tail_recursion:
-                self.warning_snack_bar(f'Food ID {food.food_id} is already in the stack')
+                self.start_snack_bar(f'Food ID {food.food_id} is already in the stack')
 
         else:
             food_card = FoodCard(food=food)
@@ -340,37 +347,88 @@ class View(MDApp):
 
     def load_stack(self) -> None:
         log.info('load_stack button pressed')
+        if not self.dat_dir.exists():
+            return self.start_snack_bar('No stacks have been saved so far.')
+
+        data = [dict(
+            file_name=stack.stem, last_modified=datetime.datetime
+                .fromtimestamp(stack.lstat().st_ctime)
+                .strftime('%m/%d/%Y'),
+        ) for stack in self.dat_dir.iterdir() if stack.suffix == '.stack']
+        if not data:
+            return self.start_snack_bar('No stacks have been saved so far.')
+
+        if not self.load_from_dialog:
+            content = LoadFromContent()
+            self.load_from_options: RecycleView = content.load_from_options
+            self.load_from_dialog = MDDialog(
+                title="Load Stack",
+                type="custom",
+                content_cls=content,
+                buttons=[
+                    MDFlatButton(
+                        text="CANCEL", text_color=self.theme_cls.primary_color,
+                        on_press=lambda *args: self.load_from_dialog.dismiss(),
+                    ),
+                ],
+            )
+
+        @mainthread
+        def callback(*_) -> None:
+            self.load_from_options.data = data
+        self.load_from_dialog.open()
+        callback()
 
     def save_stack(self) -> None:
         if not self.save_as_dialog:
+            content = SaveAsContent()
+            self.save_stack_field = content.input_field
             self.save_as_dialog = MDDialog(
-                text="",
+                title="Save Stack",
                 type="custom",
-                content_cls=SaveAsContent(),
+                content_cls=content,
+                buttons=[
+                    MDFlatButton(
+                        text="CANCEL", text_color=self.theme_cls.primary_color,
+                        on_press=lambda *args: self.save_as_dialog.dismiss(),
+                    ),
+                    MDFlatButton(
+                        text="OK", text_color=self.theme_cls.primary_color,
+                        on_press=lambda *args: self.save_stack_file_name(),
+                    ),
+                ],
             )
         self.save_as_dialog.open()
         log.info('save_stack button pressed')
 
+    def load_stack_file_name(self, file_name: str) -> None:
+        self.load_from_dialog.dismiss()
+        log.info(f'load_stack_file_name was called with `{file_name}`')
+
     def save_stack_file_name(self) -> None:
-        file_name = self.save_as_dialog.input_field.text
+        self.save_as_dialog.dismiss()
+        file_stem, self.save_stack_field.text = self.save_stack_field.text, ''
+        os.makedirs(self.dat_dir, exist_ok=True)
+        file_name = f'{file_stem}.stack'
         destination = self.dat_dir / file_name
         if destination.exists():
-            return self.warning_snack_bar(f'"{file_name}" already exists.')
+            return self.start_snack_bar(f'"{file_name}" already exists.')
 
         else:
             # noinspection PyBroadException
             try:
-                with open(destination, 'w+') as wf:
-                    writer = csv.DictWriter(wf, fieldnames=['food_id', 'num_servings'])
+                with open(destination, 'w+', newline='') as wf:
+                    writer = csv.DictWriter(wf, fieldnames=['food_id', 'validated_qty'])
                     writer.writeheader()
                     writer.writerows([dict(
-                        food_id=card.food.food_id, num_servings=float(card.validated_qty)
+                        food_id=card.food.food_id, validated_qty=float(card.validated_qty)
                     ) for card in self.food_cards.values()])
 
             except Exception:
-                return self.warning_snack_bar(f'"{file_name}" is not a valid stack name.')
+                return self.start_snack_bar(f'"{file_stem}" is not a valid stack name.')
 
-        self.warning_snack_bar(f'stack saved as "{file_name}"')
+        self.start_snack_bar(f'stack saved as "{file_stem}"')
+
 
     def begin_analysis(self) -> None:
         with self.session_manager() as session:

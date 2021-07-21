@@ -239,21 +239,66 @@
                 source: 'add-green.png'
 
 <SaveAsContent>:
+    orientation: "vertical"
+    spacing: "12dp"
+    size_hint_y: None
+    height: "120dp"
+    input_field: input_field
+
+    MDTextField:
+        id: input_field
+        font_size: '30dp'
+        hint_text: "Name"
+        multiline: False
+        selection_color: herbalife_green
+        on_text_validate: app.save_stack_file_name()
+
+
+<SavedStackItem@BoxLayout>:
+    file_name: 'file_name'
+    last_modified: 'last_modified'
+    size_hint: 1, None
+    canvas.before:
+        Color:
+            rgba: 1, 1, 1, 1
+        Rectangle:
+            size: self.size
+            pos: self.pos
+
+    orientation: 'horizontal'
     BoxLayout:
         orientation: 'vertical'
-        size: 400, 200
-        input_field: input_field
         MDLabel:
-            size_hint_y: .3
-            text: 'Name your stack'
-        MDTextField:
-            id: input_field
-            size_hint_y: .7
-            font_size: '30dp'
-            multiline: False
-            hint_text: 'Stack Name'
-            selection_color: herbalife_green
-            on_text_validate: app.save_stack_file_name()
+            font_size: '20dp'
+            text: root.file_name
+            shorten: True
+            shorten_from: 'right'
+        MDLabel:
+            font_size: '16dp'
+            text: root.last_modified
+
+    MDFlatButton:
+        text: 'LOAD'
+        text_color: app.theme_cls.primary_color
+        on_press: app.load_stack_file_name(root.file_name)
+
+
+<LoadFromContent>:
+    load_from_options: load_from_options
+    height: "360dp"
+    RecycleView:
+        id: load_from_options
+        viewclass: 'SavedStackItem'
+
+        RecycleBoxLayout:
+            padding: '5dp'
+            spacing: '5dp'
+            default_size: None, dp(80)
+            default_size_hint: 1, None
+            size_hint_y: None
+            height: self.minimum_height
+            orientation: 'vertical'
+
 
 <RootWidget>:
     orientation: 'vertical'
@@ -367,21 +412,21 @@
                     BoxLayout:
                         orientation: 'horizontal'
                         size: self.minimum_size
-                        # ClickButton:
-                        #     disabled: app.stack_present
-                        #     enabled: not self.disabled
-                        #     source: 'load.png' if self.enabled else 'load-grey.png'
-                        #     on_press: app.load_stack()
+                        ClickButton:
+                            disabled: app.stack_present
+                            enabled: not self.disabled
+                            source: 'load.png' if self.enabled else 'load-grey.png'
+                            on_press: app.load_stack()
                         ClickButton:
                             disabled: not app.stack_present
                             enabled: not self.disabled
                             source: 'reset.png' if self.enabled else 'reset-grey.png'
                             on_press: app.clear_food_cards()
-                        # ClickButton:
-                        #     disabled: not app.stack_present
-                        #     enabled: not self.disabled
-                        #     source: 'save.png' if self.enabled else 'save-grey.png'
-                        #     on_press: app.save_stack()
+                        ClickButton:
+                            disabled: not app.stack_present
+                            enabled: not self.disabled
+                            source: 'save.png' if self.enabled else 'save-grey.png'
+                            on_press: app.save_stack()
                         ClickButton:
                             disabled: not (app.stack_present and app.region_selected)
                             enabled: not self.disabled
