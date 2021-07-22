@@ -39,7 +39,7 @@ class Nutrient(Schema):
     @classmethod
     def all(cls, session: Session_t) -> Dict[int, str]:
         nutrients = session.query(cls) \
-            .order_by(cls.name_id) \
+            .order_by(cls.id) \
             .all()
         return {nut.name_id: nut.name for nut in nutrients}
 

@@ -15,7 +15,7 @@ from src.controller.constants import *
 from src.controller.objects import *
 from src.model.enums import NutrientLimitType
 
-WORKSHEET_PROTECTION_PASSWORD = 'protected'
+WORKSHEET_PROTECTION_PASSWORD = 'sam'
 
 
 # SAMPLE_FOODS = [

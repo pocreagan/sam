@@ -41,7 +41,7 @@ from kivy_deps import sdl2, glew
 splash = Splash(SPLASH_PATH,
                 binaries=a.binaries,
                 datas=a.datas,
-                text_pos=(5, 250),
+                text_pos=(250, 5),
                 text_size=12,
                 text_color='white')
 
