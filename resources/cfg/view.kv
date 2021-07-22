@@ -15,8 +15,6 @@
 #:set dark_grey utils.get_color_from_hex('#2C302E')
 #:set transparent [0, 0, 0, 0]
 
-#:set food_source_colors {'USDA': light_grey, 'HN': herbalife_green}
-
 
 <CheckMark>:
     size_hint: (None, None)
@@ -26,9 +24,10 @@
         source: 'checkmark.png'
 
 
-<RegionChip>
+<RegionChip>:
     check_box_div: check_box_div
 
+    app: app
     selected: False
     selected_color: herbalife_green
     default_color: light_grey
@@ -54,20 +53,19 @@
         pos_hint: {'center_y': .5}
         padding: "12dp", 0, 0, 0
 
-
     MDBoxLayout:
         adaptive_width: True
         padding: dp(15)
 
         Label:
             font_size: '24dp'
-            id: label
             text: root.region_name
             size_hint_x: None
             width: self.texture_size[0]
             color: [1, 1, 1, 1] if root.selected else [0, 0, 0, 1]
 
-<CustomSnackBar>
+
+<CustomSnackBar>:
     size_hint_x: 1
     radius: [0, 0, 0, 0]
     duration: 2.
@@ -104,7 +102,7 @@
 
 
 <SourceLogoRemovable>:
-    RemoveFoodButton:
+    ButtonImage:
         source: 'remove-food.png'
         pos_hint: {'x': .75, 'y': .75}
         size_hint: [.35, .35]
@@ -131,9 +129,10 @@
         text: ('' if root.food.qty_per_serving == 'NA' else root.food.qty_per_serving) if root.food else ''
 
 
-
 <FoodCard>:
+    app: app
     food: None
+
     height: '80dp'
     size_hint: 1, None
     canvas.before:
@@ -142,9 +141,6 @@
         Rectangle:
             size: self.size
             pos: self.pos
-
-    qty_field: qty_field
-    app: app
 
     BoxLayout:
         size: root.size
@@ -170,7 +166,6 @@
             size_hint: .175, 1
 
             FoodQTYField:
-                id: qty_field
                 app: app
                 root: root
                 text: str(root.validated_qty) if root.validated_qty else '1.0'
@@ -190,7 +185,7 @@
             size_hint: .025, 1
 
 
-<SearchResult>:
+<SearchResult@BoxLayout>:
     food: None
     size_hint: 1, None
     canvas.before:
@@ -225,14 +220,14 @@
             halign: 'right'
             valign: 'center'
 
-            ClickButton:
+            ButtonImage:
                 size: 50, 50
                 size_hint: None, None
                 on_press: app.add_food(root.food)
                 source: 'add-green.png'
 
 
-<SaveStackContent>:
+<UpdateStackContent>:
     orientation: "vertical"
     spacing: "12dp"
     size_hint_y: None
@@ -248,7 +243,12 @@
         on_text_validate: app.update_stack(self.text)
 
 
-<StackLoadOption>:
+<UpdateStackDialog>:
+    title: 'Save Stack As'
+    type: 'custom'
+
+
+<SelectStackOption>:
     on_release: app.select_stack(root.text)
     _no_ripple_effect: True
 
@@ -257,7 +257,7 @@
         on_press: app.delete_stack(root.text)
 
 
-<LoadStackContent>:
+<SelectStackContent>:
     container: container
     orientation: 'vertical'
 
@@ -268,6 +268,9 @@
         MDList:
             id: container
 
+<SelectStackDialog>:
+    title: 'Load Stack'
+    type: 'custom'
 
 <RootWidget>:
     orientation: 'vertical'
@@ -277,7 +280,6 @@
     search_bar: search_bar
     stack_scroll_view: stack_scroll_view
     stack_box_layout: stack_box_layout
-
 
     BoxLayout:
         orientation: 'horizontal'
@@ -293,9 +295,8 @@
             size_hint: .5, 1
             source: 'Sam-header-600x160.png'
 
-        RegionsChips:
+        StackLayout:
             id: regions_chips
-            app: app
             size_hint: .5, 1
             orientation: 'rl-bt'
             padding: '15dp'
@@ -389,25 +390,25 @@
                         orientation: 'horizontal'
                         size: self.minimum_size
 
-                        ClickButton:
+                        ButtonImage:
                             disabled: app.stack_present
                             enabled: not self.disabled
                             source: 'load.png' if self.enabled else 'load-grey.png'
-                            on_press: app.select_stack_dialog()
+                            on_press: app.open_select_stack_dialog()
 
-                        ClickButton:
+                        ButtonImage:
                             disabled: not app.stack_present
                             enabled: not self.disabled
                             source: 'reset.png' if self.enabled else 'reset-grey.png'
                             on_press: app.clear_food_cards()
 
-                        ClickButton:
+                        ButtonImage:
                             disabled: not app.stack_present
                             enabled: not self.disabled
                             source: 'save.png' if self.enabled else 'save-grey.png'
-                            on_press: app.update_stack_dialog()
+                            on_press: app.open_update_stack_dialog()
 
-                        ClickButton:
+                        ButtonImage:
                             disabled: not (app.stack_present and app.region_selected)
                             enabled: not self.disabled
                             source: 'Excel.png' if self.enabled else 'Excel-grey.png'

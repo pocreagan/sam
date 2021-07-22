@@ -1,5 +1,5 @@
 <SETUP>
-	add `/dat/` to `./.gitignore` <- talk to patrick here
+	add `/dat/` to `./.gitignore` ( talk to patrick here )
 	download `Windows x86-64 executable installer` from `https://www.python.org/downloads/release/python-379/`
 	install for all users and add to PATH
 	in `c:/projects` run `git clone https://github.com/pocreagan/sam.git`
@@ -7,8 +7,7 @@
 	run `"C:\Program Files\Python37\python.exe" -m pip install pipenv`
 	run `pipenv install --dev`
 	download `upx-3.96-win64.zip` from `https://github.com/upx/upx/releases/tag/v3.96`
-	extract contents into `c:/upx_dir`	
-
+	extract contents into `c:/upx_dir`
 
 ./build contains metadata from the build process
     spec/
@@ -27,6 +26,9 @@
         HLF formulas and nutrient amounts
 
 ./dev contains miscellaneous files used in development like TODOs and notes
+    JetBrains.kvMD.completion.v0.5.jar
+        enables PyCharm syntax highlighting in .kv files
+            File > Manage IDE Settings > Import Settings > {open .jar file} > Import and Restart
 
 ./dist contains Debug and Release builds
 

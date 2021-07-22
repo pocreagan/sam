@@ -46,6 +46,7 @@ def working_directory(directory: Path):
     os.chdir(directory)
     try:
         yield
+
     finally:
         os.chdir(_prev)
 

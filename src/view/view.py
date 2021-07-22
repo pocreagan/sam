@@ -14,6 +14,7 @@ from kivy.core.window import Window
 from kivy.lang import Builder
 from kivy.properties import BooleanProperty
 from kivy.properties import ColorProperty
+from kivy.properties import NumericProperty
 from kivy.properties import ObjectProperty
 from kivy.properties import StringProperty
 from kivy.uix.behaviors import ButtonBehavior
@@ -52,7 +53,7 @@ __all__ = [
 log = loggers.Logger('View', Logger)
 
 
-class RemoveFoodButton(ButtonBehavior, Image):
+class ButtonImage(ButtonBehavior, Image):
     pass
 
 
@@ -115,16 +116,7 @@ class FoodQTYField(MDTextField):
 class FoodCard(FloatLayout):
     food: db.Food = ObjectProperty(None)
     app: 'View' = ObjectProperty(None)
-    qty_field: FoodQTYField = ObjectProperty(None)
-
-    def __init__(self, **kwargs) -> None:
-        self.validated_qty = float(kwargs.pop('validated_qty')) if 'validated_qty' in kwargs else 1.0
-        super().__init__(**kwargs)
-
-    @mainthread
-    def kill(self, *_) -> None:
-        self.clear_widgets()
-        self.app.remove_from_stack(self)
+    validated_qty: float = NumericProperty(1.0)
 
 
 class CustomSnackBar(BaseSnackbar):
@@ -132,21 +124,17 @@ class CustomSnackBar(BaseSnackbar):
     icon = StringProperty(None)
 
     def dismiss_now(self, *_args):
+        if self.snackbar_animation_dir == "Top":
+            anim = Animation(y=(Window.height + self.height), d=0.2)
+        elif self.snackbar_animation_dir == "Left":
+            anim = Animation(x=-self.width, d=0.2)
+        elif self.snackbar_animation_dir == "Right":
+            anim = Animation(x=Window.width, d=0.2)
+        else:
+            anim = Animation(y=-self.height, d=0.2)
 
-        def dismiss(_interval):
-            if self.snackbar_animation_dir == "Top":
-                anim = Animation(y=(Window.height + self.height), d=0.2)
-            elif self.snackbar_animation_dir == "Left":
-                anim = Animation(x=-self.width, d=0.2)
-            elif self.snackbar_animation_dir == "Right":
-                anim = Animation(x=Window.width, d=0.2)
-            else:
-                anim = Animation(y=-self.height, d=0.2)
-
-            anim.bind(on_complete=lambda *args: Window.parent.remove_widget(self))
-            anim.start(self)
-
-        Clock.schedule_once(dismiss, 0.)
+        anim.bind(on_complete=lambda *args: Window.parent.remove_widget(self))
+        anim.start(self)
         self.dispatch("on_dismiss")
 
 
@@ -155,13 +143,12 @@ class CheckMark(BoxLayout):
 
 
 class RegionChip(ButtonBehavior, BoxLayout):
-    parent: 'RegionsChips'
+    app: 'View'
     selected = BooleanProperty(False)
     selected_color = ColorProperty([0, 0, 0, 0])
     default_color = ColorProperty([0, 0, 0, 0])
     region_name = StringProperty('region_name')
     check_box_div: MDBoxLayout = ObjectProperty(None)
-    label: Label = ObjectProperty(None)
     color = ColorProperty([0, 0, 0, 0])
 
     animation: Animation
@@ -173,45 +160,30 @@ class RegionChip(ButtonBehavior, BoxLayout):
 
         @mainthread
         def callback(*_) -> None:
-            self.parent.app.root.search_bar.clear_field(False)
+            self.app.root.search_bar.clear_field(False)
 
         self.animation.bind(on_complete=callback)
 
     def on_press(self) -> None:
         self.selected = not self.selected
-        _regions = self.parent.app.selected_regions
+        _regions = self.app.selected_regions
 
         if self.selected:
-            # noinspection PyProtectedMember
-            self.animation._animated_properties['color'] = self.selected_color
+            _to_color = self.selected_color
             _regions.add(self.region_name)
-            self.parent.app.region_selected = True
+            self.app.region_selected = True
             self.check_box_div.add_widget(self.check_mark)
 
         else:
-            # noinspection PyProtectedMember
-            self.animation._animated_properties['color'] = self.default_color
+            _to_color = self.default_color
             self.check_box_div.remove_widget(self.check_mark)
             _regions.remove(self.region_name)
-            if not self.parent.app.selected_regions:
-                self.parent.app.region_selected = False
+            if not self.app.selected_regions:
+                self.app.region_selected = False
 
+        # noinspection PyProtectedMember
+        self.animation._animated_properties['color'] = _to_color
         self.animation.start(self)
-
-
-class RegionsChips(StackLayout):
-    app: 'View' = ObjectProperty(None)
-
-    def add_regions(self, regions: List[str]):
-        [self.add_widget(RegionChip(region_name=region)) for region in regions]
-
-
-class ClickButton(ButtonBehavior, Image):
-    pass
-
-
-class SearchResult(BoxLayout):
-    food: db.Food = ObjectProperty(None)
 
 
 class SearchBar(MDTextField):
@@ -222,40 +194,45 @@ class SearchBar(MDTextField):
         self.focus = True
 
 
+class UpdateStackContent(BoxLayout):
+    pass
+
+
+class SelectStackOption(TwoLineAvatarListItem):
+    pass
+
+
+class SelectStackContent(BoxLayout):
+    container: MDList = ObjectProperty(None)
+
+
+class SelectStackDialog(MDDialog):
+    pass
+
+
+class UpdateStackDialog(MDDialog):
+    pass
+
+
 class RootWidget(BoxLayout):
-    regions_chips: RegionsChips = ObjectProperty(None)
+    regions_chips: StackLayout = ObjectProperty(None)
     search_bar: SearchBar = ObjectProperty(None)
     search_results: RecycleView = ObjectProperty(None)
     stack_scroll_view: ScrollView = ObjectProperty(None)
     stack_box_layout: BoxLayout = ObjectProperty(None)
 
 
-class SaveStackContent(BoxLayout):
-    pass
-
-
-class LoadStackContent(BoxLayout):
-    container: MDList = ObjectProperty(None)
-
-
-class StackLoadOption(TwoLineAvatarListItem):
-    pass
-
-
 class View(MDApp):
+    TITLE = 'Sam'
     model: Model
     root: RootWidget
-
-    save_as_dialog: MDDialog = None
-    load_from_dialog: MDDialog = None
-    load_from_content: LoadStackContent
-
-    TITLE = 'Sam'
+    build_obj: Build
     session_manager: SessionManager
     stack_session_manager: SessionManager
     regions_d: Dict[str, db.Region]
-    model: Model
-    build_obj: Build
+    update_stack_dialog: UpdateStackDialog = None
+    select_stack_dialog: SelectStackDialog = None
+    select_stack_content: SelectStackContent
 
     region_selected = BooleanProperty(False)
     stack_present = BooleanProperty(False)
@@ -273,17 +250,20 @@ class View(MDApp):
     def search_term_enter(self) -> None:
         if not self.root.search_results.data:
             self.root.search_bar.clear_field(False)
+
         if len(self.root.search_results.data) == 1:
             self.add_food(self.root.search_results.data[0]['food'])
 
     def __init__(self, **kwargs) -> None:
         kwargs['title'] = type(self).TITLE
+
         self.stack: Dict[str, db.Food] = dict()
         self.food_cards: Dict[str, FoodCard] = dict()
         self.selected_regions: Set[str] = set()
         self.dat_dir = Path(os.path.expanduser('~/Desktop/Sam'))
-        self.load_from_options: Dict[str, StackLoadOption] = {}
+        self.load_from_options: Dict[str, SelectStackOption] = {}
         self.saved_stacks: Dict[str, stacks.Stack] = {}
+
         super().__init__(**kwargs)
 
     def on_start(self, *args) -> None:
@@ -300,7 +280,9 @@ class View(MDApp):
 
             with self.session_manager() as session:
                 self.regions_d: Dict[str, db.Region] = db.Region.all(session)
-                self.root.regions_chips.add_regions(list(sorted(self.regions_d.keys(), reverse=True)))
+                [self.root.regions_chips.add_widget(
+                    RegionChip(region_name=region)
+                ) for region in sorted(self.regions_d.keys(), reverse=True)]
 
             os.makedirs(self.dat_dir, exist_ok=True)
             self.stack_session_manager = model.Database(
@@ -308,11 +290,12 @@ class View(MDApp):
             ).connect(log.spawn('StacksDB'))
 
             with self.stack_session_manager() as stack_session:
-                # noinspection PyProtectedMember
-                results = stack_session.query(stacks.Stack).order_by(stacks.Stack.name).all()
+                results = stack_session.query(stacks.Stack) \
+                    .order_by(stacks.Stack.name) \
+                    .all()
 
             self.saved_stacks = {r.name: r for r in results}
-            self.load_from_options = {name: StackLoadOption(
+            self.load_from_options = {name: SelectStackOption(
                 text=name, secondary_text=stack.created_at.strftime('%m/%d/%Y')
             ) for name, stack in self.saved_stacks.items()}
 
@@ -373,7 +356,6 @@ class View(MDApp):
             Clock.schedule_once(callback, .1)
 
         self.root.search_bar.clear_field()
-
         self.stack_present = bool(self.stack)
 
     @mainthread
@@ -404,50 +386,43 @@ class View(MDApp):
 
         Clock.schedule_once(callback, .1)
 
-    def select_stack_dialog(self) -> None:
+    def open_select_stack_dialog(self) -> None:
         log.info('load_stack button pressed')
 
         if not self.saved_stacks:
             return self.start_snack_bar('No stacks have been saved so far.')
 
-        if not self.load_from_dialog:
-            self.load_from_content = LoadStackContent()
-            self.load_from_dialog = MDDialog(
-                title="Load Stack",
-                type="custom",
-                content_cls=self.load_from_content,
-                items=[], buttons=[],
+        if not self.select_stack_dialog:
+            self.select_stack_content = SelectStackContent()
+            self.select_stack_dialog = SelectStackDialog(
+                content_cls=self.select_stack_content,
                 on_dismiss=self.root.search_bar.clear_field,
             )
 
-        self.load_from_content.container.clear_widgets()
+        self.select_stack_content.container.clear_widgets()
         for _, option in self.load_from_options.items():
-            self.load_from_content.container.add_widget(option)
+            self.select_stack_content.container.add_widget(option)
 
-        self.load_from_dialog.open()
+        self.select_stack_dialog.open()
 
-    def update_stack_dialog(self) -> None:
-        if not self.save_as_dialog:
-            content = SaveStackContent()
+    def open_update_stack_dialog(self) -> None:
+        if not self.update_stack_dialog:
+            content = UpdateStackContent()
 
             @mainthread
             def callback(*_) -> None:
                 content.input_field.focus = True
 
-            self.save_as_dialog = MDDialog(
-                title="Save Stack As",
-                type="custom",
-                content_cls=content,
-                buttons=[],
-                on_open=callback,
+            self.update_stack_dialog = UpdateStackDialog(
+                content_cls=content, on_open=callback,
                 on_dismiss=self.root.search_bar.clear_field,
             )
 
-        self.save_as_dialog.content_cls.input_field.text = ''
-        self.save_as_dialog.open()
+        self.update_stack_dialog.content_cls.input_field.text = ''
+        self.update_stack_dialog.open()
 
     def select_stack(self, stack_name: str) -> None:
-        self.load_from_dialog.dismiss()
+        self.select_stack_dialog.dismiss()
         items = self.saved_stacks[stack_name].foods
 
         with self.session_manager() as session:
@@ -468,16 +443,18 @@ class View(MDApp):
 
     def delete_stack(self, stack_name: str) -> None:
         with self.stack_session_manager() as session:
-            session.query(stacks.Stack).filter_by(id=self.saved_stacks.pop(stack_name).id).delete()
+            session.query(stacks.Stack) \
+                .filter_by(id=self.saved_stacks.pop(stack_name).id) \
+                .delete()
 
-        self.load_from_content.container.remove_widget(self.load_from_options.pop(stack_name))
+        self.select_stack_content.container.remove_widget(self.load_from_options.pop(stack_name))
         if not self.load_from_options:
-            self.load_from_dialog.dismiss()
+            self.select_stack_dialog.dismiss()
 
         log.info(f'deleted stack `{stack_name}`')
 
     def update_stack(self, stack_name: str) -> None:
-        self.save_as_dialog.dismiss()
+        self.update_stack_dialog.dismiss()
         if stack_name in self.saved_stacks:
             self.delete_stack(stack_name)
 
@@ -486,7 +463,7 @@ class View(MDApp):
                 card.food.food_id: float(card.validated_qty) for card in self.food_cards.values()
             }))
 
-            self.load_from_options[stack_name] = StackLoadOption(
+            self.load_from_options[stack_name] = SelectStackOption(
                 text=stack_name, secondary_text=self.saved_stacks[stack_name].created_at.strftime('%m/%d/%Y')
             )
 

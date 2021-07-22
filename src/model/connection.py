@@ -1,6 +1,4 @@
 """
-declarative base class must be imported in order:
-    meta -> schema -> connection
 session manager is defined with Session in closure and
 should be imported from here but not used here
 """
@@ -69,9 +67,6 @@ class Database:
         log(f'Bound session constructor')
 
         if drop_tables:
-            # if input('ARE YOU SURE YOU WANT TO DROP TABLES? -> ').lower() != 'yes':
-            #     exit(1)
-
             self.metadata.drop_all(engine)
             warn(f'Dropped tables')
 

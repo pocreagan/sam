@@ -18,45 +18,6 @@ from src.model.enums import NutrientLimitType
 WORKSHEET_PROTECTION_PASSWORD = 'sam'
 
 
-# SAMPLE_FOODS = [
-#     Food('F1111', 'Formula 1 Cookies and Cream', 1.0, 'NA', ),
-#     Food('F2222', 'Protein Drink Mix Chocolate', 1.0, 'NA', ),
-#     Food('F3333', 'Prolessa Duo', 1.0, 'NA', ),
-#     Food('111111', 'Milk, lowfat', 2.0, '240 g', ),
-#     Food('222222', 'Bananas', 1.0, '120 g', ),
-#     Food('333333', 'Strawberries', 0.5, '80 g', ),
-# ]
-#
-# SAMPLE_NUTRIENTS = [
-#     Nutrient('Energy (kcal)', NutrientLimitType.NL, [200, 120, 50, 160, 80, 40, ]),
-#     Nutrient('Fat (mg)', 10, [2.5, 0, 5, 4, 0, 0, ]),
-#     Nutrient('Protein (mg)', 50, [15, 12, 2, 10, 0, 0, ]),
-#     Nutrient('beta-Carotene (mg)', 3000, [0, 0, 0, 20, 15, 40, ]),
-#     Nutrient('Vitamin A (mg)', 2501, [120, 0, 0, 50, 0, 0, ]),
-# ]
-#
-# SAMPLE_REGIONS = [
-#     Region(
-#         'US & Canada', 'US Tolerable Upper Intake Levels, Vitamins and Elements 2019',
-#         SAMPLE_FOODS, SAMPLE_NUTRIENTS,
-#     ),
-#     Region(
-#         'Australia & New Zealand', 'US Tolerable Upper Intake Levels, Vitamins and Elements 2019',
-#         SAMPLE_FOODS, SAMPLE_NUTRIENTS,
-#     ),
-#     Region(
-#         'China', 'US Tolerable Upper Intake Levels, Vitamins and Elements 2019',
-#         SAMPLE_FOODS, SAMPLE_NUTRIENTS,
-#     ),
-# ]
-#
-# today = datetime.datetime.now()
-#
-# SAMPLE_OUTPUT = Output([('Performed:', today), (
-#     'App Version:', today - datetime.timedelta(days=15)
-# )], SAMPLE_REGIONS)
-
-
 class Format:
     wb: xlsxWorkbook
     _cache: Dict[Tuple, xlsxFormat] = {}
@@ -162,7 +123,8 @@ def start_sheet(wb: xlsxWorkbook, name: str,
                 col_widths: List[Tuple[int, int, int]],
                 row_heights: List[Tuple[int, int]], zoom: int = None) -> xlsxWorksheet:
     ws = wb.add_worksheet(name)
-    ws.protect(WORKSHEET_PROTECTION_PASSWORD)
+    if WORKSHEET_PROTECTION_PASSWORD:
+        ws.protect(WORKSHEET_PROTECTION_PASSWORD)
 
     for row, height in row_heights:
         ws.set_row(row, height=height)
@@ -294,6 +256,7 @@ def make_summary(wb: xlsxWorkbook, output: Output) -> None:
             fmt = Format().left()
             if is_bad:
                 fmt.fail_fg().bold()
+
             ws.write_string(row, 3, SUMMARY_RESULT_STRINGS[is_bad], fmt())
             row += 1
 
