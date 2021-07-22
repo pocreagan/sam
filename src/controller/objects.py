@@ -33,8 +33,8 @@ class Region:
     foods: List['Food']
     nutrients: List['Nutrient']
 
-    def __post_init__(self):
-        self.nutrients.sort(key=attrgetter('name'))
+    # def __post_init__(self):
+        # self.nutrients.sort(key=attrgetter('name'))
 
     @property
     def exceeds_guidance_level(self) -> bool:
