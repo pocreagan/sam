@@ -21,6 +21,7 @@
 <CheckMark>:
     size_hint: (None, None)
     size: ("26dp", "26dp")
+
     Image:
         source: 'checkmark.png'
 
@@ -73,6 +74,7 @@
     size_hint_y: 110 / 800
     bg_color: light_grey
     on_press: self.dismiss_now()
+
     MDIconButton:
         pos_hint: {'center_y': .5}
         icon: root.icon
@@ -191,8 +193,6 @@
 <SearchResult>:
     food: None
     size_hint: 1, None
-
-
     canvas.before:
         Color:
             rgba: 1, 1, 1, 1
@@ -251,6 +251,7 @@
 <StackLoadOption>:
     on_release: app.select_stack(root.text)
     _no_ripple_effect: True
+
     IconLeftWidget:
         icon: 'trash-can-outline'
         on_press: app.delete_stack(root.text)
@@ -357,6 +358,7 @@
             Rectangle:
                 size: self.size
                 pos: self.pos
+
         orientation: 'horizontal'
         size_hint: 1, 0.1375
         padding: dp(10)
@@ -378,34 +380,38 @@
 
             BoxLayout:
                 size_hint: .5, 1
+
                 AnchorLayout:
                     valign: 'center'
                     halign: 'right'
+
                     BoxLayout:
                         orientation: 'horizontal'
                         size: self.minimum_size
+
                         ClickButton:
                             disabled: app.stack_present
                             enabled: not self.disabled
                             source: 'load.png' if self.enabled else 'load-grey.png'
                             on_press: app.select_stack_dialog()
+
                         ClickButton:
                             disabled: not app.stack_present
                             enabled: not self.disabled
                             source: 'reset.png' if self.enabled else 'reset-grey.png'
                             on_press: app.clear_food_cards()
+
                         ClickButton:
                             disabled: not app.stack_present
                             enabled: not self.disabled
                             source: 'save.png' if self.enabled else 'save-grey.png'
                             on_press: app.update_stack_dialog()
+
                         ClickButton:
                             disabled: not (app.stack_present and app.region_selected)
                             enabled: not self.disabled
                             source: 'Excel.png' if self.enabled else 'Excel-grey.png'
                             on_press: app.begin_analysis()
-
-
 
 
 RootWidget:
