@@ -281,7 +281,7 @@ class View(MDApp):
         self.stack: Dict[str, db.Food] = dict()
         self.food_cards: Dict[str, FoodCard] = dict()
         self.selected_regions: Set[str] = set()
-        self.dat_dir = Path(os.path.expanduser("~/Desktop/Sam/Preferences"))
+        self.dat_dir = Path(os.path.expanduser('~/Desktop/Sam'))
         self.load_from_options: Dict[str, StackLoadOption] = {}
         self.saved_stacks: Dict[str, stacks.Stack] = {}
         super().__init__(**kwargs)
@@ -302,6 +302,7 @@ class View(MDApp):
                 self.regions_d: Dict[str, db.Region] = db.Region.all(session)
                 self.root.regions_chips.add_regions(list(sorted(self.regions_d.keys(), reverse=True)))
 
+            os.makedirs(self.dat_dir, exist_ok=True)
             self.stack_session_manager = model.Database(
                 stacks.Schema, f'sqlite:///{self.dat_dir / "saved-stacks.db"}'
             ).connect(log.spawn('StacksDB'))
