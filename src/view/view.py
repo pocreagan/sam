@@ -491,6 +491,7 @@ class View(MDApp):
             )
 
         log.info(f'updated stack `{stack_name}`')
+        self.start_snack_bar(f'stack saved as `{stack_name}`')
 
     def begin_analysis(self) -> None:
         with self.session_manager() as session:
