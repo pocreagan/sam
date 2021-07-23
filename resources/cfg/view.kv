@@ -37,8 +37,8 @@
     color: self.default_color
 
     size_hint: None,  None
-    height: "60dp"
-    padding: 0, 0, "14dp", 0
+    height: "45dp"
+    padding: 0, 0, "10dp", 0
     width: self.minimum_width
 
     canvas:
@@ -47,20 +47,20 @@
         RoundedRectangle:
             pos: self.pos
             size: self.size
-            radius: [dp(12),]
+            radius: [dp(9),]
 
     MDBoxLayout:
         id: check_box_div
         adaptive_size: True
         pos_hint: {'center_y': .5}
-        padding: "12dp", 0, 0, 0
+        padding: "9dp", 0, 0, 0
 
     MDBoxLayout:
         adaptive_width: True
-        padding: dp(15)
+        padding: dp(12)
 
         Label:
-            font_size: '24dp'
+            font_size: '18dp'
             text: root.region_name
             size_hint_x: None
             width: self.texture_size[0]
@@ -300,8 +300,8 @@
             id: regions_chips
             size_hint: .5, 1
             orientation: 'rl-bt'
-            padding: '15dp'
-            spacing: '15dp'
+            padding: '10dp'
+            spacing: '5dp'
 
     MDSeparator:
         height: "2dp"
