@@ -4,12 +4,6 @@ BUGS:
 
 FEATURES:
     scrape and diff RACC
-    save as dialog
-    add herbalife region selected by default at top left
-        not unselectable
-        green outline, checkmark, text
-        white field
-        always included in sheet output
 
 
 meet with tech guy

@@ -2,6 +2,7 @@ from dataclasses import dataclass
 from dataclasses import InitVar
 from typing import Callable
 from typing import Tuple
+from typing import Type
 from typing import TypeVar
 
 from kivy.clock import mainthread as _main_thread
@@ -11,6 +12,7 @@ from kivy.input import MotionEvent
 # noinspection SpellCheckingInspection
 __all__ = [
     'mainthread',
+    'singleton',
     'show',
     'hide',
     'TouchDown',
@@ -59,3 +61,14 @@ class TouchDown:
     def move_to(self, touch: MotionEvent) -> None:
         new_x, new_y = self.absolute_touch_coordinates(touch)
         Window.top, Window.left = self.last_top + (new_y - self.last_y), self.last_left + (new_x - self.last_x)
+
+
+_TT = TypeVar('_TT')
+
+
+def singleton(cla: Type[_TT]) -> _TT:
+    instance = getattr(cla, '_instance', None)
+    if instance is None:
+        instance = cla()
+        setattr(cla, '_instance', instance)
+    return instance

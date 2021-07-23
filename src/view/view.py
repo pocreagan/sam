@@ -8,6 +8,7 @@ from typing import Callable
 from typing import Dict
 from typing import List
 from typing import Set
+from typing import Type
 from typing import TypeVar
 
 from kivy import Logger
@@ -51,6 +52,8 @@ from src.view.utils import mainthread
 __all__ = [
     'View',
 ]
+
+from src.view.utils import singleton
 
 log = loggers.Logger('View', Logger)
 
@@ -111,9 +114,12 @@ class FoodQTYField(MDTextField):
         super().on_focus(_arg, is_focused)
 
 
-class FoodCard(FloatLayout):
+class FoodItem(FloatLayout):
     food: db.Food = ObjectProperty(None)
-    app: 'View' = ObjectProperty(None)
+
+
+class FoodCard(FoodItem):
+    pass
 
 
 class CustomSnackBar(BaseSnackbar):
@@ -124,37 +130,31 @@ class CustomSnackBar(BaseSnackbar):
     def open(self, *args):
         super().open()
         self.app.snack_bar_state = True
-        log.info('snack bar state = True')
 
     def dismiss(self, *args):
         super().dismiss()
         self.app.snack_bar_state = False
-        log.info('snack bar state = False')
 
     def on_press(self):
-        if self.snackbar_animation_dir == "Top":
-            anim = Animation(y=(Window.height + self.height), d=0.2)
-        elif self.snackbar_animation_dir == "Left":
-            anim = Animation(x=-self.width, d=0.2)
-        elif self.snackbar_animation_dir == "Right":
-            anim = Animation(x=Window.width, d=0.2)
-        else:
-            anim = Animation(y=-self.height, d=0.2)
-
         def callback(*_) -> None:
             Window.parent.remove_widget(self)
             self.app.snack_bar_state = False
 
+        anim = Animation(y=-self.height, d=0.2)
         anim.bind(on_complete=callback)
         anim.start(self)
         self.dispatch("on_dismiss")
 
 
-class CheckMark(BoxLayout):
+class RegionCheckMark(BoxLayout):
     pass
 
 
-class RegionChip(ButtonBehavior, BoxLayout):
+class RegionChipBase(ButtonBehavior, BoxLayout):
+    pass
+
+
+class RegionChipSelectable(RegionChipBase):
     app: 'View'
     selected = BooleanProperty(False)
     selected_color = ColorProperty([0, 0, 0, 0])
@@ -164,10 +164,10 @@ class RegionChip(ButtonBehavior, BoxLayout):
     color = ColorProperty([0, 0, 0, 0])
 
     animation: Animation
-    check_mark: CheckMark
+    check_mark: RegionCheckMark
 
     def on_kv_post(self, base_widget):
-        self.check_mark = CheckMark()
+        self.check_mark = RegionCheckMark()
         self.animation = Animation(color=self.selected_color, d=0.3)
 
         @mainthread
@@ -198,12 +198,56 @@ class RegionChip(ButtonBehavior, BoxLayout):
         self.animation.start(self)
 
 
-class HerbalifeChip(ButtonBehavior, BoxLayout):
+class HerbalifeChip(RegionChipBase):
     pass
 
 
-class UpdateStackContent(BoxLayout):
+class TextInputDialogContent(BoxLayout):
     pass
+
+
+class UpdateStackContent(TextInputDialogContent):
+    input_field: MDTextField
+
+
+class TextInputDialog(MDDialog):
+    content_cla: Type
+    initial_text = ''
+
+    def on_open(self, *_) -> None:
+        self.content_cls.input_field.focus = True
+
+    def __init__(self, **kwargs) -> None:
+        super().__init__(content_cls=self.content_cla(), **kwargs)
+
+    @classmethod
+    def open(cls) -> None:
+        self = singleton(cls)
+        self.content_cls.input_field.text = cls.initial_text
+        MDDialog.open(self)
+
+    @classmethod
+    def dismiss(cls) -> None:
+        self = singleton(cls)
+        MDDialog.dismiss(self)
+
+
+class UpdateStackDialog(TextInputDialog):
+    content_cla = UpdateStackContent
+    initial_text = ''
+
+
+class SaveAsContent(TextInputDialogContent):
+    input_field: MDTextField
+
+
+class SaveAsDialog(TextInputDialog):
+    content_cla = SaveAsContent
+    initial_text = 'Sam'
+
+    def on_open(self, *_) -> None:
+        self.content_cls.input_field.focus = True
+        self.content_cls.input_field.select_all()
 
 
 class SelectStackOption(TwoLineAvatarListItem):
@@ -215,7 +259,7 @@ class SelectStackContent(BoxLayout):
 
 
 class SelectStackDialog(MDDialog):
-    dialog: 'SelectStackDialog' = None
+    content_cls: SelectStackContent
 
     app: 'View' = ObjectProperty(None)
 
@@ -225,78 +269,28 @@ class SelectStackDialog(MDDialog):
 
     @classmethod
     def open(cls) -> None:
-        if not cls.dialog:
-            cls.dialog = cls()
-
-        cls.dialog.content_cls.container.clear_widgets()
-        for name in sorted(cls.dialog.app.saved_stacks.keys()):
-            cls.dialog._stacks[name] = SelectStackOption(
-                text=name, secondary_text=cls.dialog.app.saved_stacks[name].created_at.strftime('%m/%d/%Y')
+        self = singleton(cls)
+        self.content_cls.container.clear_widgets()
+        for name in sorted(self.app.saved_stacks.keys()):
+            self._stacks[name] = SelectStackOption(
+                text=name, secondary_text=self.app.saved_stacks[name].created_at.strftime('%m/%d/%Y')
             )
-            cls.dialog.content_cls.container.add_widget(cls.dialog._stacks[name])
+            self.content_cls.container.add_widget(self._stacks[name])
 
-        super(cls, cls.dialog).open()
+        MDDialog.open(self)
 
     @classmethod
     def remove(cls, option: stacks.Stack) -> None:
-        if not cls.dialog:
-            cls.dialog = cls()
-        cls.dialog.content_cls.container.remove_widget(cls.dialog._stacks.pop(option.name))
-        if not cls.dialog._stacks:
-            cls.dialog.dismiss()
+        self = singleton(cls)
+        self.content_cls.container.remove_widget(self._stacks.pop(option.name))
+        if not self._stacks:
+            self.dismiss()
 
-    def dismiss(self):
-        super().dismiss()
+    @classmethod
+    def dismiss(cls):
+        self = singleton(cls)
+        MDDialog.dismiss(self)
         self.content_cls.container.clear_widgets()
-
-
-class UpdateStackDialog(MDDialog):
-    dialog: 'UpdateStackDialog' = None
-
-    def __init__(self, **kwargs) -> None:
-        super().__init__(content_cls=UpdateStackContent(), **kwargs)
-
-        @mainthread
-        def callback(*_) -> None:
-            self.content_cls.input_field.focus = True
-
-        self.bind(on_open=callback)
-
-    @classmethod
-    def open(cls) -> None:
-        if not cls.dialog:
-            cls.dialog = cls()
-
-        cls.dialog.content_cls.input_field.text = ''
-
-        super(cls, cls.dialog).open()
-
-
-class SaveAsContent(BoxLayout):
-    pass
-
-
-class SaveAsDialog(MDDialog):
-    dialog: 'SaveAsDialog' = None
-
-    def __init__(self, **kwargs) -> None:
-        super().__init__(content_cls=SaveAsContent(), **kwargs)
-
-        @mainthread
-        def callback(*_) -> None:
-            self.content_cls.input_field.focus = True
-            self.content_cls.input_field.select_all()
-
-        self.bind(on_open=callback)
-
-    @classmethod
-    def open(cls) -> None:
-        if not cls.dialog:
-            cls.dialog = cls()
-
-        cls.dialog.content_cls.input_field.text = 'Sam'
-
-        super(cls, cls.dialog).open()
 
 
 class RootWidget(BoxLayout):
@@ -322,15 +316,12 @@ class View(MDApp):
     TITLE = 'Sam'
     root: RootWidget
     stack: RecycleView
-
     snack_bar: CustomSnackBar = None
-    update_stack_dialog: UpdateStackDialog = None
-    select_stack_dialog: SelectStackDialog = None
 
     session_manager: SessionManager
     stack_session_manager: SessionManager
 
-    regions_d: Dict[str, db.Region]
+    regions: Dict[str, db.Region]
     saved_stacks: Dict[str, stacks.Stack]
     model: Model
     build_obj: Build
@@ -371,7 +362,7 @@ class View(MDApp):
         ).connect(log.spawn('Database'))
 
         with self.session_manager() as session:
-            self.regions_d = db.Region.all(session)
+            self.regions = db.Region.all(session)
 
     def init_saved_stacks(self) -> None:
         os.makedirs(self.dat_dir / "Preferences", exist_ok=True)
@@ -428,8 +419,8 @@ class View(MDApp):
         self.root = Builder.load_file(__RESOURCE__.cfg('view.kv'))
 
         [self.root.regions_chips.add_widget(
-            RegionChip(region_name=region)
-        ) for region in sorted(self.regions_d.keys(), reverse=True) if region != 'Herbalife']
+            RegionChipSelectable(region_name=region)
+        ) for region in sorted(self.regions.keys(), reverse=True) if region != 'Herbalife']
         self.root.regions_chips.add_widget(HerbalifeChip())
 
         self.stack = self.root.stack_view
@@ -492,7 +483,7 @@ class View(MDApp):
         UpdateStackDialog.open()
 
     def select_stack(self, stack_name: str) -> None:
-        SelectStackDialog.dialog.dismiss()
+        SelectStackDialog.dismiss()
         items = self.saved_stacks[stack_name].foods
 
         with self.session_manager() as session:
@@ -522,13 +513,13 @@ class View(MDApp):
         if not from_update:
             SelectStackDialog.remove(removed_stack)
             if not self.saved_stacks:
-                SelectStackDialog.dialog.dismiss()
+                SelectStackDialog.dismiss()
 
         log.info(f'deleted stack `{stack_name}`')
         callback()
 
     def update_stack(self, stack_name: str) -> None:
-        UpdateStackDialog.dialog.dismiss()
+        UpdateStackDialog.dismiss()
         if stack_name in self.saved_stacks:
             self.delete_stack(stack_name, from_update=True)
 
@@ -549,19 +540,20 @@ class View(MDApp):
         SaveAsDialog.open()
 
     def begin_analysis(self, name: str = None) -> None:
-        SaveAsDialog.dialog.dismiss()
+        SaveAsDialog.dismiss()
 
         name = name or 'Sam'
         file_name = f'{name}-{datetime.datetime.now().strftime("%Y%m%d-%H%M%S")}'
-        output_path = self.dat_dir / 'Results' / file_name
+
         try:
-            with open(output_path, 'x') as _:
+            with open(self.dat_dir / 'Results' / file_name, 'x') as _:
                 pass
+
         except OSError:
             return self.start_snack_bar(f'File name `{name}` invalid.')
 
         _stack = [card['food'] for card in self.stack.data]
-        _regions = [self.regions_d['Herbalife']] + [self.regions_d[r] for r in sorted(self.selected_regions)]
+        _regions = [self.regions['Herbalife']] + [self.regions[r] for r in sorted(self.selected_regions)]
         with self.session_manager() as session:
             stack = db.get_from_ids(session, _stack)
             regions = db.get_from_ids(session, _regions)

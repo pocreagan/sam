@@ -19,28 +19,49 @@
 <ButtonImage@ButtonBehavior+Image>:
 
 
-<CheckMark>:
+<RegionCheckMark>:
     size_hint: (None, None)
     size: ("26dp", "26dp")
+    png_source: 'checkmark.png'
 
     Image:
-        source: 'checkmark.png'
+        source: root.png_source
+
+<CheckMarkDiv@MDBoxLayout>:
+    adaptive_size: True
+    pos_hint: {'center_y': .5}
+    padding: "9dp", 0, 0, 0
 
 
-<RegionChip>:
+<RegionTextDiv@MDBoxLayout>:
+    _text_color: [0, 0, 0, 1]
+    region_name: 'region_name'
+    adaptive_width: True
+    padding: dp(12)
+
+    Label:
+        font_size: '18dp'
+        text: root.region_name
+        size_hint_x: None
+        width: self.texture_size[0]
+        color: root._text_color
+
+<RegionChipBase>:
+    size_hint: None,  None
+    height: "45dp"
+    padding: 0, 0, "10dp", 0
+    width: self.minimum_width
+
+
+<RegionChipSelectable>:
+    app: app
     check_box_div: check_box_div
 
-    app: app
     selected: False
     selected_color: herbalife_green
     default_color: light_grey
     region_name: 'region_name'
     color: self.default_color
-
-    size_hint: None,  None
-    height: "45dp"
-    padding: 0, 0, "10dp", 0
-    width: self.minimum_width
 
     canvas:
         Color:
@@ -50,30 +71,15 @@
             size: self.size
             radius: [dp(9),]
 
-    MDBoxLayout:
+    CheckMarkDiv:
         id: check_box_div
-        adaptive_size: True
-        pos_hint: {'center_y': .5}
-        padding: "9dp", 0, 0, 0
 
-    MDBoxLayout:
-        adaptive_width: True
-        padding: dp(12)
-
-        Label:
-            font_size: '18dp'
-            text: root.region_name
-            size_hint_x: None
-            width: self.texture_size[0]
-            color: [1, 1, 1, 1] if root.selected else [0, 0, 0, 1]
+    RegionTextDiv:
+        region_name: root.region_name
+        _text_color: [1, 1, 1, 1] if root.selected else [0, 0, 0, 1]
 
 
 <HerbalifeChip>:
-    size_hint: None,  None
-    height: "45dp"
-    padding: 0, 0, "10dp", 0
-    width: self.minimum_width
-
     canvas:
         Color:
             rgba: herbalife_green
@@ -88,28 +94,14 @@
             size: self.size[0] - 2, self.size[1] - 2
             radius: [dp(8),]
 
-    MDBoxLayout:
-        id: check_box_div
-        adaptive_size: True
-        pos_hint: {'center_y': .5}
-        padding: "9dp", 0, 0, 0
-        BoxLayout:
-            size_hint: (None, None)
-            size: ("26dp", "26dp")
+    CheckMarkDiv:
+        RegionCheckMark:
+            png_source: 'checkmark-green.png'
 
-            Image:
-                source: 'checkmark-green.png'
+    RegionTextDiv:
+        region_name: 'Herbalife'
+        _text_color: herbalife_green
 
-    MDBoxLayout:
-        adaptive_width: True
-        padding: dp(12)
-
-        Label:
-            font_size: '18dp'
-            text: 'Herbalife'
-            size_hint_x: None
-            width: self.texture_size[0]
-            color: herbalife_green
 
 <CustomSnackBar>:
     app: app
@@ -175,11 +167,8 @@
         text: ('' if root.food.qty_per_serving == 'NA' else root.food.qty_per_serving) if root.food else ''
 
 
-<FoodCard>:
-    app: app
+<FoodItem>:
     food: None
-
-    height: '80dp'
     size_hint: 1, None
     canvas.before:
         Color:
@@ -188,26 +177,34 @@
             size: self.size
             pos: self.pos
 
+
+<FoodItemLeftSide@BoxLayout>:
+    orientation: 'horizontal'
+    padding: '10dp'
+    spacing: '10dp'
+
+
+<FoodItemLogoDiv@BoxLayout>:
+    size_hint: .2, 1
+
+
+<FoodCard>:
     BoxLayout:
         size: root.size
         pos: root.pos
 
-        BoxLayout:
-            orientation: 'horizontal'
+        FoodItemLeftSide:
             size_hint: .8, 1
-            padding: '10dp'
-            spacing: '10dp'
 
-            BoxLayout:
+            FoodItemLogoDiv:
                 root: root
-                size_hint: .2, 1
                 SourceLogoRemovable:
                     source_str: root.food.source.name if root.food else 'USDA'
 
             FoodLabel:
                 food: root.food
 
-        BoxLayout:
+        BoxLayout:  # to force food qty field shape and pos
             orientation: 'vertical'
             size_hint: .175, 1
 
@@ -222,39 +219,24 @@
                 helper_text_mode: 'persistent'
                 helper_text: '      SERVINGS'
 
-            MDLabel:
+            MDLabel:  # to force food qty field shape and pos
                 text: ''
                 size_hint: None, .2
 
-        MDLabel:
+        MDLabel:  # to force food qty field shape and pos
             text: ''
             size_hint: .025, 1
 
 
-<SearchResult@BoxLayout>:
-    food: None
-    size_hint: 1, None
-    canvas.before:
-        Color:
-            rgba: 1, 1, 1, 1
-        Rectangle:
-            size: self.size
-            pos: self.pos
-
+<SearchResult@FoodItem>:
     BoxLayout:
-        orientation: 'horizontal'
         size: root.size
         pos: root.pos
 
-        BoxLayout:
-            orientation: 'horizontal'
+        FoodItemLeftSide:
             size_hint: .85, 1
-            padding: '10dp'
-            spacing: '10dp'
 
-            BoxLayout:
-                root: root
-                size_hint: .2, 1
+            FoodItemLogoDiv:
                 SourceLogo:
                     source_str: root.food.source.name if root.food else 'USDA'
 
@@ -272,16 +254,21 @@
                 on_press: app.add_food(root.food)
                 source: 'add-green.png'
 
+
 <DialogTextField@MDTextField>:
     font_size: '30dp'
     multiline: False
     selection_color: medium_grey_transparent
 
-<UpdateStackContent>:
+
+<TextInputDialogContent>:
     orientation: "vertical"
     spacing: "12dp"
     size_hint_y: None
     height: "70dp"
+
+
+<UpdateStackContent>:
     input_field: input_field
 
     DialogTextField:
@@ -291,10 +278,6 @@
 
 
 <SaveAsContent>:
-    orientation: "vertical"
-    spacing: "12dp"
-    size_hint_y: None
-    height: "70dp"
     input_field: input_field
 
     DialogTextField:
@@ -304,16 +287,17 @@
         on_text_validate: app.begin_analysis(self.text)
 
 
-<SaveAsDialog>:
-    title: 'Save Analysis As'
+<TextInputDialog>:
     type: 'custom'
     on_dismiss: app.focus_search_bar()
+
+
+<SaveAsDialog>:
+    title: 'Save Analysis As'
 
 
 <UpdateStackDialog>:
     title: 'Save Stack As'
-    type: 'custom'
-    on_dismiss: app.focus_search_bar()
 
 
 <SelectStackOption>:
@@ -342,6 +326,18 @@
     type: 'custom'
     on_dismiss: app.focus_search_bar()
 
+
+<FoodsView@RecycleView>:
+    size_hint_x: .5
+
+    RecycleBoxLayout:
+        padding: '5dp'
+        spacing: '5dp'
+        default_size: None, dp(80)
+        default_size_hint: 1, None
+        size_hint_y: None
+        height: self.minimum_height
+        orientation: 'vertical'
 
 <RootWidget>:
     orientation: 'vertical'
@@ -380,41 +376,19 @@
         orientation: 'horizontal'
         padding: "1dp"
 
-        RecycleView:
+        FoodsView:
             id: search_results
             size_hint_x: .5
             viewclass: 'SearchResult'
-
-            RecycleBoxLayout:
-                padding: '5dp'
-                spacing: '5dp'
-                default_size: None, dp(80)
-                default_size_hint: 1, None
-                size_hint_y: None
-                height: self.minimum_height
-                orientation: 'vertical'
-
-                # SearchResult widgets go here
 
         MDSeparator:
             orientation: 'vertical'
             height: "1dp"
 
-        RecycleView:
+        FoodsView:
             id: stack_view
             size_hint_x: .5
             viewclass: 'FoodCard'
-
-            RecycleBoxLayout:
-                padding: '5dp'
-                spacing: '5dp'
-                default_size: None, dp(80)
-                default_size_hint: 1, None
-                size_hint_y: None
-                height: self.minimum_height
-                orientation: 'vertical'
-
-                # FoodCard widgets go here
 
     MDSeparator:
         height: "4dp"
