@@ -4,10 +4,7 @@ BUGS:
 
 FEATURES:
     scrape and diff RACC
-    make sure there is sufficient room in regions div
-    reformat output spreadsheet
-        smaller logo
-        order nutrients as per canonical list
+    make sure saved and loaded stacks are rendered in the same order
 
 
 meet with tech guy

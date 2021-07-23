@@ -8,7 +8,6 @@ from typing import Set
 
 from kivy import Logger
 from kivy.animation import Animation
-from kivy.clock import Clock
 from kivy.clock import mainthread
 from kivy.core.window import Window
 from kivy.lang import Builder
@@ -19,6 +18,7 @@ from kivy.properties import StringProperty
 from kivy.uix.behaviors import ButtonBehavior
 from kivy.uix.boxlayout import BoxLayout
 from kivy.uix.floatlayout import FloatLayout
+from kivy.uix.image import Image
 from kivy.uix.recycleview import RecycleView
 from kivy.uix.stacklayout import StackLayout
 from kivymd.app import MDApp
@@ -111,10 +111,21 @@ class FoodCard(FloatLayout):
 
 
 class CustomSnackBar(BaseSnackbar):
+    app: 'View' = ObjectProperty(None)
     text = StringProperty(None)
     icon = StringProperty(None)
 
-    def dismiss_now(self, *_args):
+    def open(self, *args):
+        super().open()
+        self.app.snack_bar_state = True
+        log.info('snack bar state = True')
+
+    def dismiss(self, *args):
+        super().dismiss()
+        self.app.snack_bar_state = False
+        log.info('snack bar state = False')
+
+    def on_press(self):
         if self.snackbar_animation_dir == "Top":
             anim = Animation(y=(Window.height + self.height), d=0.2)
         elif self.snackbar_animation_dir == "Left":
@@ -124,7 +135,11 @@ class CustomSnackBar(BaseSnackbar):
         else:
             anim = Animation(y=-self.height, d=0.2)
 
-        anim.bind(on_complete=lambda *args: Window.parent.remove_widget(self))
+        def callback(*_) -> None:
+            Window.parent.remove_widget(self)
+            self.app.snack_bar_state = False
+
+        anim.bind(on_complete=callback)
         anim.start(self)
         self.dispatch("on_dismiss")
 
@@ -151,7 +166,7 @@ class RegionChip(ButtonBehavior, BoxLayout):
 
         @mainthread
         def callback(*_) -> None:
-            self.app.root.focus_search(False)
+            self.app.focus_search_bar(False)
 
         self.animation.bind(on_complete=callback)
 
@@ -190,35 +205,80 @@ class SelectStackContent(BoxLayout):
 
 
 class SelectStackDialog(MDDialog):
-    pass
+    dialog: 'SelectStackDialog' = None
+
+    app: 'View' = ObjectProperty(None)
+
+    def __init__(self, **kwargs) -> None:
+        self._stacks: Dict[str, stacks.Stack] = {}
+        super().__init__(content_cls=SelectStackContent(), **kwargs)
+
+    @classmethod
+    def open(cls) -> None:
+        if not cls.dialog:
+            cls.dialog = cls()
+        cls.dialog.content_cls.container.clear_widgets()
+        for s in cls.dialog.app.saved_stacks.values():
+            cls.dialog._stacks[s.name] = SelectStackOption(
+                text=s.name, secondary_text=s.created_at.strftime('%m/%d/%Y')
+            )
+            cls.dialog.content_cls.container.add_widget(cls.dialog._stacks[s.name])
+
+        super(cls, cls.dialog).open()
+
+    @classmethod
+    def remove(cls, option: stacks.Stack) -> None:
+        if not cls.dialog:
+            cls.dialog = cls()
+        cls.dialog.content_cls.container.remove_widget(cls.dialog._stacks.pop(option.name))
+        if not cls.dialog._stacks:
+            cls.dialog.dismiss()
 
 
 class UpdateStackDialog(MDDialog):
-    pass
+    dialog: 'UpdateStackDialog' = None
+
+    def __init__(self, **kwargs) -> None:
+        super().__init__(content_cls=UpdateStackContent(), **kwargs)
+
+        @mainthread
+        def callback(*_) -> None:
+            self.content_cls.input_field.focus = True
+
+        self.bind(on_open=callback)
+
+    @classmethod
+    def open(cls) -> None:
+        if not cls.dialog:
+            cls.dialog = cls()
+        cls.dialog.content_cls.input_field.text = ''
+        super(cls, cls.dialog).open()
 
 
 class RootWidget(BoxLayout):
     regions_chips: StackLayout = ObjectProperty(None)
-    _search_bar: MDTextField = ObjectProperty(None)
+    search_bar: MDTextField = ObjectProperty(None)
     search_results: RecycleView = ObjectProperty(None)
     stack_view: RecycleView = ObjectProperty(None)
-
-    @mainthread
-    def focus_search(self, do_clear_text: bool = True) -> None:
-        if do_clear_text:
-            self._search_bar.text = ''
-        self._search_bar.focus = True
 
 
 class View(MDApp):
     TITLE = 'Sam'
     root: RootWidget
+    stack: RecycleView
 
+    snack_bar: CustomSnackBar = None
     update_stack_dialog: UpdateStackDialog = None
     select_stack_dialog: SelectStackDialog = None
 
     region_selected = BooleanProperty(False)
     stack_present = BooleanProperty(False)
+
+    @mainthread
+    def focus_search_bar(self, do_clear_text: bool = True) -> None:
+        if do_clear_text:
+            self.root.search_bar.text = ''
+        self.root.search_bar.focus = True
 
     def search_term_change(self, term: str) -> None:
         stripped, results = term.strip(), []
@@ -232,7 +292,7 @@ class View(MDApp):
 
     def search_term_enter(self) -> None:
         if not self.root.search_results.data:
-            self.root.focus_search(False)
+            self.focus_search_bar(False)
 
         if len(self.root.search_results.data) == 1:
             self.add_food(self.root.search_results.data[0]['food'])
@@ -240,10 +300,8 @@ class View(MDApp):
     def __init__(self, **kwargs) -> None:
         kwargs['title'] = type(self).TITLE
 
-        self.stack: Dict[str, db.Food] = dict()
         self.selected_regions: Set[str] = set()
         self.dat_dir = Path(os.path.expanduser('~/Desktop/Sam'))
-        self.load_from_options: Dict[str, SelectStackOption] = {}
 
         with log.timer('Config read'):
             self.model = Model(**__RESOURCE__.cfg('app.yml', parse=True))
@@ -262,13 +320,14 @@ class View(MDApp):
             ).connect(log.spawn('StacksDB'))
 
             with self.stack_session_manager() as stack_session:
-                results = stack_session.query(stacks.Stack) \
+                results: List[stacks.Stack] = stack_session.query(stacks.Stack) \
                     .order_by(stacks.Stack.name) \
                     .all()
 
             self.saved_stacks: Dict[str, stacks.Stack] = {r.name: r for r in results}
 
         super().__init__(**kwargs)
+        self.snack_bar_state = False
 
     @staticmethod
     def close_splash_screen() -> None:
@@ -284,7 +343,7 @@ class View(MDApp):
         log.info(f'on_start called {time.perf_counter()}')
         register_topmost(Window, type(self).TITLE)
         self.close_splash_screen()
-        self.root.focus_search()
+        self.focus_search_bar()
 
     def build(self):
         self.theme_cls.colors = THEME
@@ -297,87 +356,70 @@ class View(MDApp):
             RegionChip(region_name=region)
         ) for region in sorted(self.regions_d.keys(), reverse=True)]
 
-        self.load_from_options = {name: SelectStackOption(
-            text=name, secondary_text=stack.created_at.strftime('%m/%d/%Y')
-        ) for name, stack in self.saved_stacks.items()}
+        self.stack = self.root.stack_view
 
         return self.root
 
-    @staticmethod
     @mainthread
-    def start_snack_bar(text: str, icon: str = "information-outline") -> None:
-        CustomSnackBar(text=text, icon=icon).open()
+    def start_snack_bar(self, text: str, icon: str = "information-outline") -> None:
+        if not self.snack_bar:
+            self.snack_bar = CustomSnackBar(text=text, icon=icon)
+
+        else:
+            self.snack_bar.text = text
+            self.snack_bar.icon = icon
+
+        self.snack_bar.open()
 
     def after_stack_change(self, clear_field: bool = True) -> None:
-        self.root.focus_search(clear_field)
-        self.stack_present = bool(self.stack)
+        self.focus_search_bar(clear_field)
+        self.stack_present = bool(self.stack.data)
 
     def add_food(self, food: db.Food) -> None:
-        if food.food_id in self.stack:
+        if food.food_id in {card['food'].food_id for card in self.stack.data}:
             self.start_snack_bar(f'Food ID {food.food_id} is already in the stack')
 
         else:
-            self.stack[food.food_id] = food
-
-            self.root.stack_view.data.insert(0, dict(food=food))
+            self.stack.data.insert(0, dict(food=food))
             self.after_stack_change()
 
     def add_foods(self, foods: List[db.Food]) -> None:
-        self.stack = {food.food_id: food for food in foods}
-
-        self.root.stack_view.data = [dict(food=food) for food in foods]
+        self.stack.data = [dict(food=food) for food in foods]
         self.after_stack_change()
 
     @mainthread
-    def remove_from_stack(self, *foods: db.Food) -> None:
-        for food in foods:
-            self.stack.pop(food.food_id)
-
-        self.root.stack_view.data = [d for d in self.root.stack_view.data if d['food'].food_id in self.stack]
+    def remove_from_stack(self, food: db.Food) -> None:
+        self.stack.data = [d for d in self.stack.data if d['food'].food_id != food.food_id]
         self.after_stack_change(False)
 
     def clear_food_cards(self) -> None:
+        if self.snack_bar_state:
+            return
+
         log.info('clear_food_cards button pressed')
 
-        self.remove_from_stack(*self.stack.values())
-        Clock.schedule_once(self.root.focus_search, .1)
+        self.stack.data = []
+        self.after_stack_change()
 
     def open_select_stack_dialog(self) -> None:
+        if self.snack_bar_state:
+            return
+
         log.info('load_stack button pressed')
 
         if not self.saved_stacks:
             return self.start_snack_bar('No stacks have been saved so far.')
 
-        if not self.select_stack_dialog:
-            self.select_stack_dialog = SelectStackDialog(
-                content_cls=SelectStackContent(),
-                on_dismiss=self.root.focus_search,
-            )
-
-        self.select_stack_dialog.content_cls.container.clear_widgets()
-        for _, option in self.load_from_options.items():
-            self.select_stack_dialog.content_cls.container.add_widget(option)
-
-        self.select_stack_dialog.open()
+        SelectStackDialog.open()
 
     def open_update_stack_dialog(self) -> None:
-        if not self.update_stack_dialog:
-            content = UpdateStackContent()
+        if self.snack_bar_state:
+            return
 
-            @mainthread
-            def callback(*_) -> None:
-                content.input_field.focus = True
-
-            self.update_stack_dialog = UpdateStackDialog(
-                content_cls=content, on_open=callback,
-                on_dismiss=self.root.focus_search,
-            )
-
-        self.update_stack_dialog.content_cls.input_field.text = ''
-        self.update_stack_dialog.open()
+        UpdateStackDialog.open()
 
     def select_stack(self, stack_name: str) -> None:
-        self.select_stack_dialog.dismiss()
+        SelectStackDialog.dialog.dismiss()
         items = self.saved_stacks[stack_name].foods
 
         with self.session_manager() as session:
@@ -394,37 +436,46 @@ class View(MDApp):
 
         log.info(f'selected stack `{stack_name}`')
 
-    def delete_stack(self, stack_name: str) -> None:
-        with self.stack_session_manager() as session:
-            session.query(stacks.Stack) \
-                .filter_by(id=self.saved_stacks.pop(stack_name).id) \
-                .delete()
+    def delete_stack(self, stack_name: str, from_update: bool = False) -> None:
+        removed_stack = self.saved_stacks.pop(stack_name)
 
-        self.select_stack_dialog.content_cls.container.remove_widget(self.load_from_options.pop(stack_name))
-        if not self.load_from_options:
-            self.select_stack_dialog.dismiss()
+        @mainthread
+        def callback() -> None:
+            with self.stack_session_manager() as session:
+                session.query(stacks.Stack) \
+                    .filter_by(id=removed_stack.id) \
+                    .delete()
+
+        if not from_update:
+            SelectStackDialog.remove(removed_stack)
+            if not self.saved_stacks:
+                SelectStackDialog.dialog.dismiss()
 
         log.info(f'deleted stack `{stack_name}`')
+        callback()
 
     def update_stack(self, stack_name: str) -> None:
-        self.update_stack_dialog.dismiss()
+        UpdateStackDialog.dialog.dismiss()
         if stack_name in self.saved_stacks:
-            self.delete_stack(stack_name)
+            self.delete_stack(stack_name, from_update=True)
 
-        with self.stack_session_manager() as session:
-            self.saved_stacks[stack_name] = session.make(stacks.Stack(name=stack_name, foods={
-                food.food_id: float(food.num_servings) for food in self.stack.values()
-            }))
-
-            self.load_from_options[stack_name] = SelectStackOption(
-                text=stack_name, secondary_text=self.saved_stacks[stack_name].created_at.strftime('%m/%d/%Y')
-            )
+        @mainthread
+        def callback() -> None:
+            with self.stack_session_manager() as session:
+                self.saved_stacks[stack_name] = new = session.make(stacks.Stack(name=stack_name, foods={
+                    card['food'].food_id: float(card['food'].num_servings) for card in self.stack.data
+                }))
+                _ = new.name, new.created_at
 
         log.info(f'updated stack `{stack_name}`')
         self.start_snack_bar(f'stack saved as `{stack_name}`')
+        callback()
 
     def begin_analysis(self) -> None:
-        stack = [card['food'] for card in self.root.stack_view.data]
+        if self.snack_bar_state:
+            return
+
+        stack = [card['food'] for card in self.stack.data]
         with self.session_manager() as session:
             bound_foods = db.get_from_ids(session, stack)
             bound_regions = db.get_from_ids(session, list([self.regions_d[r] for r in self.selected_regions]))

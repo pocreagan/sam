@@ -15,6 +15,7 @@
 #:set dark_grey utils.get_color_from_hex('#2C302E')
 #:set transparent [0, 0, 0, 0]
 
+
 <ButtonImage@ButtonBehavior+Image>:
 
 
@@ -68,12 +69,12 @@
 
 
 <CustomSnackBar>:
+    app: app
     size_hint_x: 1
     radius: [0, 0, 0, 0]
     duration: 2.
     size_hint_y: 110 / 800
     bg_color: light_grey
-    on_press: self.dismiss_now()
 
     MDIconButton:
         pos_hint: {'center_y': .5}
@@ -248,6 +249,7 @@
 <UpdateStackDialog>:
     title: 'Save Stack As'
     type: 'custom'
+    on_dismiss: app.focus_search_bar()
 
 
 <SelectStackOption>:
@@ -271,15 +273,18 @@
             id: container
 
 <SelectStackDialog>:
+    app: app
     title: 'Load Stack'
     type: 'custom'
+    on_dismiss: app.focus_search_bar()
+
 
 <RootWidget>:
     orientation: 'vertical'
 
     regions_chips: regions_chips
     search_results: search_results
-    _search_bar: _search_bar
+    search_bar: search_bar
     stack_view: stack_view
 
     BoxLayout:
@@ -368,7 +373,7 @@
             spacing: dp(20)
 
             MDTextField:
-                id: _search_bar
+                id: search_bar
                 size_hint: .5, 1
                 font_size: '30dp'
                 multiline: False
@@ -389,26 +394,22 @@
                         size: self.minimum_size
 
                         ButtonImage:
-                            disabled: app.stack_present
-                            enabled: not self.disabled
+                            enabled: not app.stack_present
                             source: 'load.png' if self.enabled else 'load-grey.png'
                             on_press: app.open_select_stack_dialog()
 
                         ButtonImage:
-                            disabled: not app.stack_present
-                            enabled: not self.disabled
+                            enabled: app.stack_present
                             source: 'reset.png' if self.enabled else 'reset-grey.png'
                             on_press: app.clear_food_cards()
 
                         ButtonImage:
-                            disabled: not app.stack_present
-                            enabled: not self.disabled
+                            enabled: app.stack_present
                             source: 'save.png' if self.enabled else 'save-grey.png'
                             on_press: app.open_update_stack_dialog()
 
                         ButtonImage:
-                            disabled: not (app.stack_present and app.region_selected)
-                            enabled: not self.disabled
+                            enabled: app.stack_present and app.region_selected
                             source: 'Excel.png' if self.enabled else 'Excel-grey.png'
                             on_press: app.begin_analysis()
 
