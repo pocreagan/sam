@@ -13,7 +13,7 @@ from src import __RESOURCE__
 from src.model.enums import NutrientLimitType
 from src.output.objects import *
 from src.output.spreadsheet.format import Format
-from src.previous.constants import *
+from src.output.spreadsheet.constants import *
 
 __all__ = [
     'write_spreadsheet',

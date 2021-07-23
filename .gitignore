@@ -8,3 +8,4 @@
 *.py[cod]
 __pycache__
 /src/_notebook
+/.run/
