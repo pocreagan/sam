@@ -1,16 +1,27 @@
 from dataclasses import dataclass
 from dataclasses import InitVar
+from typing import Callable
 from typing import Tuple
+from typing import TypeVar
 
-from kivy.clock import mainthread
+from kivy.clock import mainthread as _main_thread
 from kivy.core.window import Window
 from kivy.input import MotionEvent
 
+# noinspection SpellCheckingInspection
 __all__ = [
+    'mainthread',
     'show',
     'hide',
     'TouchDown',
 ]
+
+_T = TypeVar('_T', bound=Callable)
+
+
+# noinspection SpellCheckingInspection
+def mainthread(f: _T) -> _T:
+    return _main_thread(f)
 
 
 @mainthread

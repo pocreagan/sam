@@ -9,7 +9,6 @@ from typing import Set
 from kivy import Logger
 from kivy.animation import Animation
 from kivy.clock import Clock
-from kivy.clock import mainthread
 from kivy.core.window import Window
 from kivy.lang import Builder
 from kivy.properties import BooleanProperty
@@ -19,7 +18,6 @@ from kivy.properties import StringProperty
 from kivy.uix.behaviors import ButtonBehavior
 from kivy.uix.boxlayout import BoxLayout
 from kivy.uix.floatlayout import FloatLayout
-from kivy.uix.image import Image
 from kivy.uix.recycleview import RecycleView
 from kivy.uix.stacklayout import StackLayout
 from kivymd.app import MDApp
@@ -31,17 +29,21 @@ from kivymd.uix.list import TwoLineAvatarListItem
 from kivymd.uix.snackbar import BaseSnackbar
 from kivymd.uix.textfield import MDTextField
 from KivyOnTop import register_topmost
+from KivyOnTop import set_always_on_top
+from KivyOnTop import set_not_always_on_top
 
 from src import __RESOURCE__
 from src import model
 from src import output
 from src.base import loggers
 from src.model import db
+from src.model import SessionManager
 from src.model import stacks
 from src.model.config import Build
 from src.model.config import Model
 from src.output import Output
 from src.view.palette import *
+from src.view.utils import mainthread
 
 __all__ = [
     'View',
@@ -218,6 +220,7 @@ class SelectStackDialog(MDDialog):
     def open(cls) -> None:
         if not cls.dialog:
             cls.dialog = cls()
+
         cls.dialog.content_cls.container.clear_widgets()
         for name in sorted(cls.dialog.app.saved_stacks.keys()):
             cls.dialog._stacks[name] = SelectStackOption(
@@ -234,6 +237,10 @@ class SelectStackDialog(MDDialog):
         cls.dialog.content_cls.container.remove_widget(cls.dialog._stacks.pop(option.name))
         if not cls.dialog._stacks:
             cls.dialog.dismiss()
+
+    def dismiss(self):
+        super().dismiss()
+        self.content_cls.container.clear_widgets()
 
 
 class UpdateStackDialog(MDDialog):
@@ -252,7 +259,9 @@ class UpdateStackDialog(MDDialog):
     def open(cls) -> None:
         if not cls.dialog:
             cls.dialog = cls()
+
         cls.dialog.content_cls.input_field.text = ''
+
         super(cls, cls.dialog).open()
 
 
@@ -271,6 +280,14 @@ class View(MDApp):
     snack_bar: CustomSnackBar = None
     update_stack_dialog: UpdateStackDialog = None
     select_stack_dialog: SelectStackDialog = None
+
+    session_manager: SessionManager
+    stack_session_manager: SessionManager
+
+    regions_d: Dict[str, db.Region]
+    saved_stacks: Dict[str, stacks.Stack]
+    model: Model
+    build_obj: Build
 
     region_selected = BooleanProperty(False)
     stack_present = BooleanProperty(False)
@@ -298,6 +315,31 @@ class View(MDApp):
         if len(self.root.search_results.data) == 1:
             self.add_food(self.root.search_results.data[0]['food'])
 
+    def init_configs(self) -> None:
+        self.model = Model(**__RESOURCE__.cfg('app.yml', parse=True))
+        self.build_obj = Build(**__RESOURCE__.cfg('build.yml', parse=True))
+
+    def init_model(self) -> None:
+        self.session_manager = model.Database(
+            db.Schema, f'sqlite:///{__RESOURCE__.db("backend.db")}'
+        ).connect(log.spawn('Database'))
+
+        with self.session_manager() as session:
+            self.regions_d = db.Region.all(session)
+
+    def init_saved_stacks(self) -> None:
+        os.makedirs(self.dat_dir / "Preferences", exist_ok=True)
+        self.stack_session_manager = model.Database(
+            stacks.Schema, f'sqlite:///{self.dat_dir / "Preferences" / "saved-stacks.db"}'
+        ).connect(log.spawn('StacksDB'))
+
+        with self.stack_session_manager() as stack_session:
+            results: List[stacks.Stack] = stack_session.query(stacks.Stack) \
+                .order_by(stacks.Stack.name) \
+                .all()
+
+        self.saved_stacks = {r.name: r for r in results}
+
     def __init__(self, **kwargs) -> None:
         kwargs['title'] = type(self).TITLE
 
@@ -305,27 +347,9 @@ class View(MDApp):
         self.dat_dir = Path(os.path.expanduser('~/Desktop/Sam'))
 
         with log.timer('Config read'):
-            self.model = Model(**__RESOURCE__.cfg('app.yml', parse=True))
-            self.build_obj = Build(**__RESOURCE__.cfg('build.yml', parse=True))
-
-            self.session_manager = model.Database(
-                db.Schema, f'sqlite:///{__RESOURCE__.db(self.model.CONNECTION_STRING_SUFFIX)}'
-            ).connect(log.spawn('Database'))
-
-            with self.session_manager() as session:
-                self.regions_d: Dict[str, db.Region] = db.Region.all(session)
-
-            os.makedirs(self.dat_dir / "Preferences", exist_ok=True)
-            self.stack_session_manager = model.Database(
-                stacks.Schema, f'sqlite:///{self.dat_dir / "Preferences" / "saved-stacks.db"}'
-            ).connect(log.spawn('StacksDB'))
-
-            with self.stack_session_manager() as stack_session:
-                results: List[stacks.Stack] = stack_session.query(stacks.Stack) \
-                    .order_by(stacks.Stack.name) \
-                    .all()
-
-            self.saved_stacks: Dict[str, stacks.Stack] = {r.name: r for r in results}
+            self.init_configs()
+            self.init_model()
+            self.init_saved_stacks()
 
         super().__init__(**kwargs)
         self.snack_bar_state = False
@@ -342,8 +366,10 @@ class View(MDApp):
 
     def on_start(self, *args) -> None:
         log.info(f'on_start called {time.perf_counter()}')
-        register_topmost(Window, type(self).TITLE)
+        # register_topmost(Window, type(self).TITLE)
         self.close_splash_screen()
+        set_always_on_top(type(self).TITLE)
+        mainthread(lambda: set_not_always_on_top(type(self).TITLE))()
         self.focus_search_bar()
 
     def build(self):
@@ -375,6 +401,7 @@ class View(MDApp):
     def after_stack_change(self, clear_field: bool = True, delay: float = 0.) -> None:
         def callback(*_) -> None:
             self.focus_search_bar(clear_field)
+
         Clock.schedule_once(callback, delay)
         self.stack_present = bool(self.stack.data)
 
@@ -492,8 +519,6 @@ class View(MDApp):
             self.dat_dir / 'Results', f'Sam-{datetime.datetime.now().strftime("%Y%m%d-%H%M%S")}',
             self.build_obj.app_version,
         )
-
-        self.close_app()
 
     @mainthread
     def close_app(self) -> None:

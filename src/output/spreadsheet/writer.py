@@ -1,6 +1,7 @@
 import datetime
 import os
 import subprocess
+import time
 from operator import attrgetter
 from pathlib import Path
 from typing import List
@@ -155,7 +156,7 @@ def write_spreadsheet(output: Output, directory: Path, file_name: str, app_versi
 
     try:
         with xlsxWorkbook(str(output_file_path)) as wb:
-            Format.wb = wb
+            Format.start(wb)
 
             ws = start_sheet(wb, 'Sam', COL_WIDTHS, [], 130, None)
             row = write_metadata(ws, app_version)

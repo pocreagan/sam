@@ -108,6 +108,11 @@ class Format:
         return _fmt
 
     @classmethod
+    def start(cls, wb: xlsxWorkbook) -> None:
+        cls._cache.clear()
+        cls.wb = wb
+
+    @classmethod
     @contextlib.contextmanager
     def white_background(cls):
         cls._default['bg_color'] = 'white'
