@@ -35,15 +35,15 @@ SUMMARY_ROW_HEIGHTS_CHAR = [
     (0, 14.)
 ]
 
-REGION_COL_WIDTHS_CHAR = [
+COL_WIDTHS = [
     (0, 2.),
     (1, 14.),
     (2, 24.),
 ]
-for i in range(3, 100):
-    REGION_COL_WIDTHS_CHAR.append((i, 7.))
+for i in range(3, 200):
+    COL_WIDTHS.append((i, 7.))
 
-REGION_ROW_HEIGHTS_CHAR = [
+ROW_HEIGHTS = [
     (0, 14.),
     (1, 31.),
     (2, 31.),

@@ -1,8 +1,8 @@
-import datetime
 from typing import Dict
 from typing import Iterator
 from typing import List
 from typing import Optional
+from typing import Tuple
 from typing import Type
 from typing import TypeVar
 from typing import Union
@@ -15,10 +15,8 @@ from sqlalchemy import String
 from sqlalchemy.orm import DeclarativeMeta
 from sqlalchemy.orm import joinedload
 
-from src.controller import objects
 from src.model.connection import Session_t
 from src.model.enums import FoodSource
-from src.model.enums import NutrientLimitType
 from src.model.meta import declarative_base_factory
 from src.model.meta import Relationship
 from src.model.meta import TableMixin
@@ -37,6 +35,12 @@ class Nutrient(Schema):
     name = Column(String(128), nullable=False)  # canonical name for the nutrient
 
     @classmethod
+    def as_list(cls, session: Session_t) -> List['Nutrient']:
+        return session.query(cls) \
+            .order_by(cls.name_id) \
+            .all()
+
+    @classmethod
     def all(cls, session: Session_t) -> Dict[int, str]:
         nutrients = session.query(cls) \
             .order_by(cls.id) \
@@ -51,6 +55,7 @@ class Region(Schema):
     _nutrient_data: 'NutrientData' = region_to_blob_relationship.parent
 
     def set_id(self, pk: int, nut_pk: int) -> None:
+        # noinspection PyAttributeOutsideInit
         self.id = self._nutrient_data.region_id = pk
         self._nutrient_data.id = nut_pk
 
@@ -61,12 +66,6 @@ class Region(Schema):
     @limits.setter
     def limits(self, data: 'NutrientData') -> None:
         self._nutrient_data = data
-
-    @property
-    def limits_display(self) -> List[Union[NutrientLimitType, float]]:
-        return [
-            v if v > 0. else NutrientLimitType['ND' if v == -1. else 'NL'] for v in self.limits.values()
-        ]
 
     @classmethod
     def all(cls, session: Session_t) -> Dict[str, 'Region']:
@@ -82,24 +81,27 @@ class Food(Schema):
     source = Column(Enum(FoodSource), nullable=False)
     _qty_per_serving = Column(Float)
     _nutrient_data: 'NutrientData' = food_to_blob_relationship.parent
+    num_servings: float = 1.0
 
     @classmethod
     def search(cls, session: Session_t, term: str) -> List[int]:
-        first, last = term[0], term[-1]
         split_terms = term.split()
 
         q = session.query(cls)
-        if len(split_terms) == 1 and last.isdigit():
+        if len(split_terms) == 1 and term[-1].isdigit():
+            first = term[0]
+
             if first.upper() == 'F':
                 q = q.filter(cls.food_id == term.upper())
+
             elif first.isdigit():
                 # noinspection PyUnresolvedReferences
                 q = q.filter(cls.food_id.ilike(f'{term}%'))
+
             else:
                 return []
 
         else:
-            # q = q.filter(cls.source==FoodSource.USDA)
             for t in split_terms:
                 # noinspection PyUnresolvedReferences
                 q = q.filter(cls.description.ilike(f'%{t}%'))
@@ -107,18 +109,9 @@ class Food(Schema):
         return q.all()
 
     def set_id(self, pk: int, nut_pk: int) -> None:
+        # noinspection PyAttributeOutsideInit
         self.id = self._nutrient_data.food_id = pk
         self._nutrient_data.id = nut_pk
-
-    def nutrients_float(self, num_servings: float) -> List[float]:
-        return [0. if v <= 0. else (v * num_servings) for v in self.nutrients.values()]
-
-    def nutrients_display(self, num_servings: float) -> List[Union[str, float]]:
-        return ['NL' if v <= 0. else (v * num_servings) for v in self.nutrients.values()]
-
-    def to_spreadsheet(self, num_servings: float) -> objects.Food:
-        return objects.Food(self.food_id, self.description, num_servings, self.qty_per_serving,
-                            self.nutrients_float(num_servings), self.nutrients_display(num_servings))
 
     @property
     def nutrients(self) -> Dict[int, Union[int, float]]:
@@ -155,7 +148,12 @@ class NutrientData(Schema):
 
     @classmethod
     def make(cls, d: Dict[int, str], canonical_ids: Iterator[int]) -> 'NutrientData':
-        return cls(_data=','.join(d.get(k, '') for k in canonical_ids))
+        data: Tuple[str] = tuple(d.get(k, '') for k in canonical_ids)  # type: ignore
+        return cls.make_naive(data)
+
+    @classmethod
+    def make_naive(cls, t: Tuple[str]) -> 'NutrientData':
+        return cls(_data=','.join(t))
 
     @property
     def data(self) -> Dict[int, Union[int, float]]:
@@ -167,38 +165,10 @@ _T = TypeVar('_T')
 
 def get_from_ids(session: Session_t, objects: List[_T]) -> List[_T]:
     cla = type(objects[0])
-    return session.query(cla) \
+    # noinspection PyProtectedMember
+    output = session.query(cla) \
         .filter(cla.id.in_([r.id for r in objects])) \
         .options(joinedload(cla._nutrient_data)) \
         .all()
-
-
-class Stack:
-    def __init__(self, regions: List[Region], foods: List[Food],
-                 nutrients_map: Dict[int, str], foods_servings: Dict[str, float]) -> None:
-        self._regions = regions
-        self._nutrients_map = nutrients_map
-        self._foods = [food.to_spreadsheet(foods_servings[food.food_id]) for food in foods]
-
-    def for_spreadsheet(self, app_version: datetime.datetime) -> objects.Output:
-        _regions = []
-        _amounts_h = [list(t) for t in zip(*[food.nut_float for food in self._foods])]
-        _display_val_h = [list(t) for t in zip(*[food.nut_display for food in self._foods])]
-
-        for region in self._regions:
-            _nutrients = []
-            for name, display, amount, limit in zip(
-                    self._nutrients_map.values(), _display_val_h, _amounts_h, region.limits_display
-            ):
-                _nutrients.append(objects.Nutrient(name, display, amount, limit))
-
-            _regions.append(objects.Region(region.name, region.source, self._foods, _nutrients))
-
-        return objects.Output([('Performed', datetime.datetime.now()), ('App Version:', app_version)], _regions)
-
-    @classmethod
-    def from_gui(cls, session: Session_t, regions: List[Region],
-                 foods: List[Food], food_servings: Dict[str, float]) -> 'Stack':
-        return cls(get_from_ids(session, regions), get_from_ids(
-            session, foods,
-        ), Nutrient.all(session), food_servings)
+    output_d = {m.id: m for m in output}
+    return [output_d[o.id] for o in objects]

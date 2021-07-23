@@ -53,10 +53,6 @@ class Database:
         sets up the sqlalchemy connection and declares a transaction factory context manager
         """
 
-        # SUPPRESS-LINTER <attr added to subclass in meta.py>
-        # noinspection PyUnresolvedReferences
-        _connection = self.schema.connection_name
-
         log = logger.debug if logger else print
         warn = logger.warning if logger else print
 

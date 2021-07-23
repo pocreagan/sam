@@ -14,14 +14,11 @@ from kivy.core.window import Window
 from kivy.lang import Builder
 from kivy.properties import BooleanProperty
 from kivy.properties import ColorProperty
-from kivy.properties import NumericProperty
 from kivy.properties import ObjectProperty
 from kivy.properties import StringProperty
 from kivy.uix.behaviors import ButtonBehavior
 from kivy.uix.boxlayout import BoxLayout
 from kivy.uix.floatlayout import FloatLayout
-from kivy.uix.image import Image
-from kivy.uix.label import Label
 from kivy.uix.recycleview import RecycleView
 from kivy.uix.scrollview import ScrollView
 from kivy.uix.stacklayout import StackLayout
@@ -37,13 +34,14 @@ from KivyOnTop import register_topmost
 
 from src import __RESOURCE__
 from src import model
+from src import output
 from src.base import loggers
-from src.controller import spreadsheet_out
 from src.model import db
 from src.model import SessionManager
 from src.model import stacks
 from src.model.config import Build
 from src.model.config import Model
+from src.output import Output
 from src.view.palette import *
 
 __all__ = [
@@ -51,10 +49,6 @@ __all__ = [
 ]
 
 log = loggers.Logger('View', Logger)
-
-
-class ButtonImage(ButtonBehavior, Image):
-    pass
 
 
 class SourceLogo(FloatLayout):
@@ -79,7 +73,7 @@ class FoodQTYField(MDTextField):
 
     def on_text_validate(self) -> None:
         if not self.text:
-            self.text = str(self.root.validated_qty)
+            self.text = str(self.root.food.num_servings)
 
         else:
             try:
@@ -89,10 +83,10 @@ class FoodQTYField(MDTextField):
 
             except ValueError:
                 self.app.start_snack_bar(f'`{self.text}` is not a valid QTY')
-                self.text = str(self.root.validated_qty)
+                self.text = str(self.root.food.num_servings)
 
             else:
-                self.root.validated_qty = qty
+                self.root.food.num_servings = qty
                 self.text = str(qty)
 
         super().on_text_validate()
@@ -100,7 +94,7 @@ class FoodQTYField(MDTextField):
     def on_focus(self, _arg, is_focused: bool) -> None:
         if self.was_focused ^ is_focused:
             if self.was_focused:
-                self.text = str(self.root.validated_qty)
+                self.text = str(self.root.food.num_servings)
 
             if is_focused:
                 mainthread(self.select_all)()
@@ -116,7 +110,6 @@ class FoodQTYField(MDTextField):
 class FoodCard(FloatLayout):
     food: db.Food = ObjectProperty(None)
     app: 'View' = ObjectProperty(None)
-    validated_qty: float = NumericProperty(1.0)
 
 
 class CustomSnackBar(BaseSnackbar):
@@ -186,14 +179,6 @@ class RegionChip(ButtonBehavior, BoxLayout):
         self.animation.start(self)
 
 
-class SearchBar(MDTextField):
-    @mainthread
-    def clear_field(self, do_clear_text: bool = True) -> None:
-        if do_clear_text:
-            self.text = ''
-        self.focus = True
-
-
 class UpdateStackContent(BoxLayout):
     pass
 
@@ -214,12 +199,26 @@ class UpdateStackDialog(MDDialog):
     pass
 
 
+class SearchBar(MDTextField):
+    @mainthread
+    def clear_field(self, do_clear_text: bool = True) -> None:
+        if do_clear_text:
+            self.text = ''
+        self.focus = True
+
+
 class RootWidget(BoxLayout):
     regions_chips: StackLayout = ObjectProperty(None)
     search_bar: SearchBar = ObjectProperty(None)
     search_results: RecycleView = ObjectProperty(None)
     stack_scroll_view: ScrollView = ObjectProperty(None)
     stack_box_layout: BoxLayout = ObjectProperty(None)
+
+    @mainthread
+    def focus_search(self, do_clear_text: bool = True) -> None:
+        if do_clear_text:
+            self._search_bar.text = ''
+        self._search_bar.focus = True
 
 
 class View(MDApp):
@@ -257,8 +256,7 @@ class View(MDApp):
     def __init__(self, **kwargs) -> None:
         kwargs['title'] = type(self).TITLE
 
-        self.stack: Dict[str, db.Food] = dict()
-        self.food_cards: Dict[str, FoodCard] = dict()
+        self.stack: Dict[str, FoodCard] = dict()
         self.selected_regions: Set[str] = set()
         self.dat_dir = Path(os.path.expanduser('~/Desktop/Sam'))
         self.load_from_options: Dict[str, SelectStackOption] = {}
@@ -286,7 +284,7 @@ class View(MDApp):
 
             os.makedirs(self.dat_dir, exist_ok=True)
             self.stack_session_manager = model.Database(
-                stacks.Schema, f'sqlite:///{self.dat_dir / "saved-stacks.db"}'
+                stacks.Schema, f'sqlite:///{self.dat_dir / "Preferences" / "saved-stacks.db"}'
             ).connect(log.spawn('StacksDB'))
 
             with self.stack_session_manager() as stack_session:
@@ -330,14 +328,13 @@ class View(MDApp):
         food = value if value is not None else multiple_values.pop()
 
         if food.food_id in self.stack:
-            scroll_to_widget = self.food_cards[food.food_id]
+            scroll_to_widget = self.stack[food.food_id]
             if not is_tail_recursion:
                 self.start_snack_bar(f'Food ID {food.food_id} is already in the stack')
 
         else:
-            food_card = FoodCard(food=food, validated_qty=getattr(food, 'validated_qty', 1.0))
-            self.stack[food.food_id] = food
-            self.food_cards[food.food_id] = food_card
+            food_card = FoodCard(food=food)
+            self.stack[food.food_id] = food_card
             self.root.stack_box_layout.add_widget(food_card)
             scroll_to_widget = food_card
 
@@ -368,7 +365,6 @@ class View(MDApp):
         for food_card in food_cards:
             food_id = food_card.food.food_id
             del self.stack[food_id]
-            del self.food_cards[food_id]
 
             self.root.stack_box_layout.remove_widget(food_card)
             log.info(f'Removed food `{food_id}` from stack')
@@ -379,7 +375,7 @@ class View(MDApp):
 
     def clear_food_cards(self) -> None:
         log.info('clear_food_cards button pressed')
-        self.remove_from_stack(*self.food_cards.values())
+        self.remove_from_stack(*self.stack.values())
 
         def callback(*_) -> None:
             self.root.search_bar.clear_field()
@@ -432,7 +428,7 @@ class View(MDApp):
                 .all()
 
         for food in foods:
-            food.validated_qty = items[food.food_id]
+            food.num_servings = items[food.food_id]
 
         _foods = {food.food_id: food for food in foods}
         foods = [_foods[k] for k in items.keys()]
@@ -460,7 +456,7 @@ class View(MDApp):
 
         with self.stack_session_manager() as session:
             self.saved_stacks[stack_name] = session.make(stacks.Stack(name=stack_name, foods={
-                card.food.food_id: float(card.validated_qty) for card in self.food_cards.values()
+                card.food.food_id: float(card.food.num_servings) for card in self.stack.values()
             }))
 
             self.load_from_options[stack_name] = SelectStackOption(
@@ -472,13 +468,20 @@ class View(MDApp):
 
     def begin_analysis(self) -> None:
         with self.session_manager() as session:
-            spreadsheet_out.make(
-                db.Stack.from_gui(
-                    session, [self.regions_d[r] for r in self.selected_regions], list(self.stack.values()),
-                    {k: v.validated_qty for k, v in self.food_cards.items()},
-                ).for_spreadsheet(self.build_obj.app_version),
-                f'Sam-{datetime.datetime.now().strftime("%Y%m%d-%H%M%S")}'
-            )
+            bound_foods = db.get_from_ids(session, [card.food for card in self.stack.values()])
+            bound_regions = db.get_from_ids(session, list([self.regions_d[r] for r in self.selected_regions]))
+            nutrients = db.Nutrient.as_list(session)
+
+        for bound_food in bound_foods:
+            bound_food.num_servings = self.stack[bound_food.food_id].food.num_servings
+
+        output.write_spreadsheet(
+            Output(nutrients, bound_regions, bound_foods),
+            self.dat_dir / 'Results',
+            f'Sam-{datetime.datetime.now().strftime("%Y%m%d-%H%M%S")}',
+            self.build_obj.app_version,
+        )
+
         self.close_app()
 
     @mainthread

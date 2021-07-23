@@ -56,6 +56,10 @@ class USDANutrient:
 class USDA:
     foods: Dict[int, float] = dataclasses.field(default_factory=dict)
     nutrients: Dict[int, USDANutrient] = dataclasses.field(default_factory=dict)
+    serving_size_multipliers: Dict[int, float] = None
+
+    def calc_multipliers(self) -> None:
+        self.serving_size_multipliers = {k: v * .01 for k, v in self.foods.items()}
 
 
 @dataclasses.dataclass
@@ -235,6 +239,9 @@ class Parser:
         food_nutrients: Dict[int, str] = {}
         staged: Deque[db.Food] = deque()
 
+        serving_size_multipliers = model.usda.serving_size_multipliers
+        nutrient_alias_d = model.usda.nutrients
+
         for response in responses:
             _json = response.json()
             foods = _json['foods']
@@ -254,13 +261,14 @@ class Parser:
             for d in response['foodNutrients']:
                 nutrient_id = d['nutrientId']
 
-                usda_nutrient = model.usda.nutrients.get(nutrient_id)
-                if not usda_nutrient:
-                    continue
+                if nutrient_id in nutrient_alias_d:
+                    usda_nutrient = nutrient_alias_d[nutrient_id]
+                    raw_value = d['value']
 
-                value = round(usda_nutrient.multiplier * float(d['value']) * model.usda.foods[food_id] * .01, 6)
-                if value:
-                    food_nutrients[usda_nutrient.name_id] = str(value)
+                    if raw_value:
+                        food_nutrients[usda_nutrient.name_id] = str(
+                            round(usda_nutrient.multiplier * d['value'] * serving_size_multipliers[food_id], 6)
+                        )
 
             if not food_nutrients:
                 is_error = True
@@ -318,17 +326,13 @@ class Parser:
                 with log.timer('Zeros to empty strings'):
                     result.replace(to_replace='0.0', value='', inplace=True)
 
-                staged: Deque[db.Food] = deque()
-                canonical_ids = model.canonical_ids
                 with log.timer('Iterating through rows'):
-                    for food_id, desc, *values in result.itertuples(index=False, name=None):
-                        staged.append(db.Food(food_id=food_id,
-                                              description=desc, source=FoodSource.HLF,
-                                              nutrients=db.NutrientData.make(dict(zip(
-                                                  canonical_ids, values)
-                                              ), canonical_ids)))
-
-                self.q.append(list(staged))
+                    self.q.append([
+                        db.Food(food_id=food_id,
+                                description=desc, source=FoodSource.HLF,
+                                nutrients=db.NutrientData.make_naive(values))
+                        for food_id, desc, *values in result.itertuples(index=False, name=None)
+                    ])
 
     def parse_dat(self, wb: Dict[str, pd.DataFrame]) -> Model:
         log = self.log.spawn('Data Sheet')
@@ -351,6 +355,8 @@ class Parser:
                 for row_num, (food_id, qty) in ws.enum:
                     check_and_insert(log, row_num, model.usda.foods, int(food_id),
                                      round(float(qty), 6), f'qty for `{food_id}`')
+
+                model.usda.calc_multipliers()
 
             with worksheet(log, wb, 'USDANutrients', ['CanonicalName', 'NutrientID', 'Multiplier']) as ws:
                 ws.df.sort_values('NutrientID', axis=0, ascending=True, inplace=True)
