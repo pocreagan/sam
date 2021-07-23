@@ -75,6 +75,10 @@ class Region:
     any_guidance_level_exceeded: bool = False
 
     @property
+    def bad_first_then_as_before(self) -> int:
+        return int(not self.any_guidance_level_exceeded)
+
+    @property
     def bad_first_then_alphabetical(self) -> Tuple[int, str]:
         return int(not self.any_guidance_level_exceeded), self.obj.name
 

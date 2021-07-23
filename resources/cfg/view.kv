@@ -68,6 +68,49 @@
             color: [1, 1, 1, 1] if root.selected else [0, 0, 0, 1]
 
 
+<HerbalifeChip>:
+    size_hint: None,  None
+    height: "45dp"
+    padding: 0, 0, "10dp", 0
+    width: self.minimum_width
+
+    canvas:
+        Color:
+            rgba: herbalife_green
+        RoundedRectangle:
+            pos: self.pos
+            size: self.size
+            radius: [dp(9),]
+        Color:
+            rgba: [1, 1, 1, 1]
+        RoundedRectangle:
+            pos: self.pos[0] + 1, self.pos[1] + 1
+            size: self.size[0] - 2, self.size[1] - 2
+            radius: [dp(8),]
+
+    MDBoxLayout:
+        id: check_box_div
+        adaptive_size: True
+        pos_hint: {'center_y': .5}
+        padding: "9dp", 0, 0, 0
+        BoxLayout:
+            size_hint: (None, None)
+            size: ("26dp", "26dp")
+
+            Image:
+                source: 'checkmark-green.png'
+
+    MDBoxLayout:
+        adaptive_width: True
+        padding: dp(12)
+
+        Label:
+            font_size: '18dp'
+            text: 'Herbalife'
+            size_hint_x: None
+            width: self.texture_size[0]
+            color: herbalife_green
+
 <CustomSnackBar>:
     app: app
     size_hint_x: 1
@@ -229,6 +272,10 @@
                 on_press: app.add_food(root.food)
                 source: 'add-green.png'
 
+<DialogTextField@MDTextField>:
+    font_size: '30dp'
+    multiline: False
+    selection_color: medium_grey_transparent
 
 <UpdateStackContent>:
     orientation: "vertical"
@@ -237,13 +284,30 @@
     height: "70dp"
     input_field: input_field
 
-    MDTextField:
+    DialogTextField:
         id: input_field
-        font_size: '30dp'
         hint_text: "Name"
-        multiline: False
-        selection_color: herbalife_green
         on_text_validate: app.update_stack(self.text)
+
+
+<SaveAsContent>:
+    orientation: "vertical"
+    spacing: "12dp"
+    size_hint_y: None
+    height: "70dp"
+    input_field: input_field
+
+    DialogTextField:
+        id: input_field
+        hint_text: 'File Name'
+        text: 'Sam'
+        on_text_validate: app.begin_analysis(self.text)
+
+
+<SaveAsDialog>:
+    title: 'Save Analysis As'
+    type: 'custom'
+    on_dismiss: app.focus_search_bar()
 
 
 <UpdateStackDialog>:
@@ -412,10 +476,10 @@
                             on_press: app.open_update_stack_dialog()
 
                         ButtonImage:
-                            enabled: app.stack_present and app.region_selected
+                            enabled: app.stack_present
                             disabled: not self.enabled
                             source: 'Excel.png' if self.enabled else 'Excel-grey.png'
-                            on_press: app.begin_analysis()
+                            on_press: app.open_save_as_dialog()
 
 
 RootWidget:

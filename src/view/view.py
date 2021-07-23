@@ -1,10 +1,14 @@
 import datetime
+import functools
 import os
 import time
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
+from typing import Callable
 from typing import Dict
 from typing import List
 from typing import Set
+from typing import TypeVar
 
 from kivy import Logger
 from kivy.animation import Animation
@@ -28,7 +32,6 @@ from kivymd.uix.list import TwoLineAvatarListItem
 # noinspection PyProtectedMember
 from kivymd.uix.snackbar import BaseSnackbar
 from kivymd.uix.textfield import MDTextField
-from KivyOnTop import register_topmost
 from KivyOnTop import set_always_on_top
 from KivyOnTop import set_not_always_on_top
 
@@ -195,6 +198,10 @@ class RegionChip(ButtonBehavior, BoxLayout):
         self.animation.start(self)
 
 
+class HerbalifeChip(ButtonBehavior, BoxLayout):
+    pass
+
+
 class UpdateStackContent(BoxLayout):
     pass
 
@@ -265,11 +272,50 @@ class UpdateStackDialog(MDDialog):
         super(cls, cls.dialog).open()
 
 
+class SaveAsContent(BoxLayout):
+    pass
+
+
+class SaveAsDialog(MDDialog):
+    dialog: 'SaveAsDialog' = None
+
+    def __init__(self, **kwargs) -> None:
+        super().__init__(content_cls=SaveAsContent(), **kwargs)
+
+        @mainthread
+        def callback(*_) -> None:
+            self.content_cls.input_field.focus = True
+            self.content_cls.input_field.select_all()
+
+        self.bind(on_open=callback)
+
+    @classmethod
+    def open(cls) -> None:
+        if not cls.dialog:
+            cls.dialog = cls()
+
+        cls.dialog.content_cls.input_field.text = 'Sam'
+
+        super(cls, cls.dialog).open()
+
+
 class RootWidget(BoxLayout):
     regions_chips: StackLayout = ObjectProperty(None)
     search_bar: MDTextField = ObjectProperty(None)
     search_results: RecycleView = ObjectProperty(None)
     stack_view: RecycleView = ObjectProperty(None)
+
+
+_C = TypeVar('_C', bound=Callable)
+
+
+def if_not_snack_bar(f: _C) -> _C:
+    @functools.wraps(f)
+    def inner(self, *args, **kwargs):
+        if not self.snack_bar_state:
+            return f(self, *args, **kwargs)
+
+    return inner
 
 
 class View(MDApp):
@@ -347,9 +393,11 @@ class View(MDApp):
         self.dat_dir = Path(os.path.expanduser('~/Desktop/Sam'))
 
         with log.timer('Config read'):
-            self.init_configs()
-            self.init_model()
-            self.init_saved_stacks()
+            with ThreadPoolExecutor() as threads:
+                threads.submit(self.init_configs)
+                threads.submit(self.init_model)
+                threads.submit(self.init_saved_stacks)
+                threads.shutdown(wait=True)
 
         super().__init__(**kwargs)
         self.snack_bar_state = False
@@ -381,7 +429,8 @@ class View(MDApp):
 
         [self.root.regions_chips.add_widget(
             RegionChip(region_name=region)
-        ) for region in sorted(self.regions_d.keys(), reverse=True)]
+        ) for region in sorted(self.regions_d.keys(), reverse=True) if region != 'Herbalife']
+        self.root.regions_chips.add_widget(HerbalifeChip())
 
         self.stack = self.root.stack_view
 
@@ -422,19 +471,15 @@ class View(MDApp):
         self.stack.data = [d for d in self.stack.data if d['food'].food_id != food.food_id]
         self.after_stack_change(False)
 
+    @if_not_snack_bar
     def clear_food_cards(self) -> None:
-        if self.snack_bar_state:
-            return
-
         log.info('clear_food_cards button pressed')
 
         self.stack.data = []
         self.after_stack_change(delay=.1)
 
+    @if_not_snack_bar
     def open_select_stack_dialog(self) -> None:
-        if self.snack_bar_state:
-            return
-
         log.info('load_stack button pressed')
 
         if not self.saved_stacks:
@@ -442,10 +487,8 @@ class View(MDApp):
 
         SelectStackDialog.open()
 
+    @if_not_snack_bar
     def open_update_stack_dialog(self) -> None:
-        if self.snack_bar_state:
-            return
-
         UpdateStackDialog.open()
 
     def select_stack(self, stack_name: str) -> None:
@@ -495,29 +538,41 @@ class View(MDApp):
                 self.saved_stacks[stack_name] = new = session.make(stacks.Stack(name=stack_name, foods={
                     card['food'].food_id: float(card['food'].num_servings) for card in self.stack.data
                 }))
-                _ = new.name, new.created_at
+                _ = new.name, new.created_at  # so saved stacks doesn't raise an unbound error on access
 
         log.info(f'updated stack `{stack_name}`')
         self.start_snack_bar(f'stack saved as `{stack_name}`')
         callback()
 
-    def begin_analysis(self) -> None:
-        if self.snack_bar_state:
-            return
+    @if_not_snack_bar
+    def open_save_as_dialog(self) -> None:
+        SaveAsDialog.open()
 
-        stack = [card['food'] for card in self.stack.data]
+    def begin_analysis(self, name: str = None) -> None:
+        SaveAsDialog.dialog.dismiss()
+
+        name = name or 'Sam'
+        file_name = f'{name}-{datetime.datetime.now().strftime("%Y%m%d-%H%M%S")}'
+        output_path = self.dat_dir / 'Results' / file_name
+        try:
+            with open(output_path, 'x') as _:
+                pass
+        except OSError:
+            return self.start_snack_bar(f'File name `{name}` invalid.')
+
+        _stack = [card['food'] for card in self.stack.data]
+        _regions = [self.regions_d['Herbalife']] + [self.regions_d[r] for r in sorted(self.selected_regions)]
         with self.session_manager() as session:
-            bound_foods = db.get_from_ids(session, stack)
-            bound_regions = db.get_from_ids(session, list([self.regions_d[r] for r in self.selected_regions]))
+            stack = db.get_from_ids(session, _stack)
+            regions = db.get_from_ids(session, _regions)
             nutrients = db.Nutrient.as_list(session)
 
-        for bound_food, food in zip(bound_foods, stack):
-            bound_food.num_servings = food.num_servings
+        for food, _food in zip(stack, _stack):
+            food.num_servings = _food.num_servings
 
         output.write_spreadsheet(
-            Output(nutrients, bound_regions, bound_foods),
-            self.dat_dir / 'Results', f'Sam-{datetime.datetime.now().strftime("%Y%m%d-%H%M%S")}',
-            self.build_obj.app_version,
+            Output(nutrients, regions, stack),
+            self.dat_dir / 'Results', file_name, self.build_obj.app_version,
         )
 
     @mainthread

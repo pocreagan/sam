@@ -146,7 +146,7 @@ def write_foods(ws: xlsxWorksheet, row: int, output: Output) -> None:
 
 
 def write_spreadsheet(output: Output, directory: Path, file_name: str, app_version: datetime.datetime) -> None:
-    output.regions.sort(key=attrgetter('bad_first_then_alphabetical'))
+    output.regions.sort(key=attrgetter('bad_first_then_as_before'))
     output.nutrients.sort(key=attrgetter('bad_first_then_canonical_order'))
 
     os.makedirs(directory, exist_ok=True)
