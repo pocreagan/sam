@@ -232,7 +232,7 @@ class View(MDApp):
 
     def search_term_enter(self) -> None:
         if not self.root.search_results.data:
-            self.root.search_bar.clear_field(False)
+            self.root.focus_search(False)
 
         if len(self.root.search_results.data) == 1:
             self.add_food(self.root.search_results.data[0]['food'])
