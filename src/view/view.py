@@ -205,7 +205,6 @@ class RootWidget(BoxLayout):
 
     @mainthread
     def focus_search(self, do_clear_text: bool = True) -> None:
-        # TODO: replace all references to SearchBar with this method
         if do_clear_text:
             self._search_bar.text = ''
         self._search_bar.focus = True
