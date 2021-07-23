@@ -315,7 +315,7 @@ class View(MDApp):
             with self.session_manager() as session:
                 self.regions_d: Dict[str, db.Region] = db.Region.all(session)
 
-            os.makedirs(self.dat_dir, exist_ok=True)
+            os.makedirs(self.dat_dir / "Preferences", exist_ok=True)
             self.stack_session_manager = model.Database(
                 stacks.Schema, f'sqlite:///{self.dat_dir / "Preferences" / "saved-stacks.db"}'
             ).connect(log.spawn('StacksDB'))
