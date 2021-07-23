@@ -211,11 +211,11 @@ class RootWidget(BoxLayout):
     regions_chips: StackLayout = ObjectProperty(None)
     search_bar: SearchBar = ObjectProperty(None)
     search_results: RecycleView = ObjectProperty(None)
-    stack_scroll_view: ScrollView = ObjectProperty(None)
-    stack_box_layout: BoxLayout = ObjectProperty(None)
+    stack_view: RecycleView = ObjectProperty(None)
 
     @mainthread
     def focus_search(self, do_clear_text: bool = True) -> None:
+        # TODO: replace all references to SearchBar with this method
         if do_clear_text:
             self._search_bar.text = ''
         self._search_bar.focus = True
@@ -251,7 +251,9 @@ class View(MDApp):
             self.root.search_bar.clear_field(False)
 
         if len(self.root.search_results.data) == 1:
-            self.add_food(self.root.search_results.data[0]['food'])
+            food = self.root.search_results.data[0]['food']
+            log.info(food)
+            self.add_food(food)
 
     def __init__(self, **kwargs) -> None:
         kwargs['title'] = type(self).TITLE
@@ -263,6 +265,16 @@ class View(MDApp):
         self.saved_stacks: Dict[str, stacks.Stack] = {}
 
         super().__init__(**kwargs)
+
+    @staticmethod
+    def close_splash_screen() -> None:
+        try:
+            # noinspection PyUnresolvedReferences
+            import pyi_splash
+        except ImportError:
+            pass
+        else:
+            pyi_splash.close()
 
     def on_start(self, *args) -> None:
         log.info(f'on_start called {time.perf_counter()}')
@@ -297,16 +309,7 @@ class View(MDApp):
                 text=name, secondary_text=stack.created_at.strftime('%m/%d/%Y')
             ) for name, stack in self.saved_stacks.items()}
 
-        try:
-            # noinspection PyUnresolvedReferences
-            import pyi_splash
-
-        except ImportError:
-            pass
-
-        else:
-            pyi_splash.close()
-
+        self.close_splash_screen()
         self.root.search_bar.clear_field()
 
     def build(self):
@@ -320,58 +323,30 @@ class View(MDApp):
     def start_snack_bar(text: str, icon: str = "information-outline") -> None:
         CustomSnackBar(text=text, icon=icon).open()
 
-    def add_food(self, value: db.Food = None, multiple_values: List[db.Food] = None) -> None:
-        is_tail_recursion = multiple_values is not None
-        if is_tail_recursion and value is not None:
-            raise TypeError
+    def after_stack_change(self, clear_field: bool = True) -> None:
+        self.root.search_bar.clear_field(clear_field)
+        self.stack_present = bool(self.stack)
 
-        food = value if value is not None else multiple_values.pop()
-
+    def add_food(self, food: db.Food) -> None:
         if food.food_id in self.stack:
-            scroll_to_widget = self.stack[food.food_id]
-            if not is_tail_recursion:
-                self.start_snack_bar(f'Food ID {food.food_id} is already in the stack')
-
+            self.start_snack_bar(f'Food ID {food.food_id} is already in the stack')
         else:
-            food_card = FoodCard(food=food)
-            self.stack[food.food_id] = food_card
-            self.root.stack_box_layout.add_widget(food_card)
-            scroll_to_widget = food_card
+            self.stack[food.food_id] = food
+            self.root.stack_view.data.insert(0, dict(food=food))
 
-        if scroll_to_widget:
-            @mainthread
-            def scroll_to_widget_callback(widget):
-                if self.root.stack_box_layout.height > self.root.stack_scroll_view.height:
-                    self.root.stack_scroll_view.scroll_to(widget)
+        self.after_stack_change()
 
-            scroll_to_widget_callback(scroll_to_widget)
-
-        if is_tail_recursion and multiple_values:
-            def callback(*_) -> None:
-                self.add_food(multiple_values=multiple_values)
-
-            Clock.schedule_once(callback, .1)
-
-        self.root.search_bar.clear_field()
-        self.stack_present = bool(self.stack)
+    def add_foods(self, foods: List[db.Food]) -> None:
+        self.stack = {food.food_id: food for food in foods}
+        self.root.stack_view.data = [dict(food=food) for food in foods]
+        self.after_stack_change()
 
     @mainthread
-    def recalculate_scroll_view(self) -> None:
-        if self.root.stack_box_layout.height < self.root.stack_scroll_view.height:
-            self.root.stack_scroll_view.scroll_y = 1.
-
-    @mainthread
-    def remove_from_stack(self, *food_cards: FoodCard) -> None:
-        for food_card in food_cards:
-            food_id = food_card.food.food_id
-            del self.stack[food_id]
-
-            self.root.stack_box_layout.remove_widget(food_card)
-            log.info(f'Removed food `{food_id}` from stack')
-
-        self.root.search_bar.clear_field(False)
-        self.recalculate_scroll_view()
-        self.stack_present = bool(self.stack)
+    def remove_from_stack(self, *foods: db.Food) -> None:
+        for food in foods:
+            self.stack.pop(food.food_id)
+        self.root.stack_view.data = [d for d in self.root.stack_view.data if d['food'].food_id in self.stack]
+        self.after_stack_change(False)
 
     def clear_food_cards(self) -> None:
         log.info('clear_food_cards button pressed')
@@ -431,9 +406,7 @@ class View(MDApp):
             food.num_servings = items[food.food_id]
 
         _foods = {food.food_id: food for food in foods}
-        foods = [_foods[k] for k in items.keys()]
-        foods.reverse()
-        self.add_food(multiple_values=foods)
+        self.add_foods([_foods[k] for k in items.keys()])
 
         log.info(f'selected stack `{stack_name}`')
 
@@ -467,13 +440,14 @@ class View(MDApp):
         self.start_snack_bar(f'stack saved as `{stack_name}`')
 
     def begin_analysis(self) -> None:
+        stack = [card['food'] for card in self.root.stack_view.data]
         with self.session_manager() as session:
-            bound_foods = db.get_from_ids(session, [card.food for card in self.stack.values()])
+            bound_foods = db.get_from_ids(session, stack)
             bound_regions = db.get_from_ids(session, list([self.regions_d[r] for r in self.selected_regions]))
             nutrients = db.Nutrient.as_list(session)
 
-        for bound_food in bound_foods:
-            bound_food.num_servings = self.stack[bound_food.food_id].food.num_servings
+        for bound_food, food in zip(bound_foods, stack):
+            bound_food.num_servings = food.num_servings
 
         output.write_spreadsheet(
             Output(nutrients, bound_regions, bound_foods),

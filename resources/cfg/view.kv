@@ -108,7 +108,7 @@
         source: 'remove-food.png'
         pos_hint: {'x': .75, 'y': .75}
         size_hint: [.35, .35]
-        on_press: app.remove_from_stack(self.parent.parent.root)
+        on_press: app.remove_from_stack(self.parent.parent.root.food)
 
 
 <FoodLabel@BoxLayout>:
@@ -280,8 +280,7 @@
     regions_chips: regions_chips
     search_results: search_results
     search_bar: search_bar
-    stack_scroll_view: stack_scroll_view
-    stack_box_layout: stack_box_layout
+    stack_view: stack_view
 
     BoxLayout:
         orientation: 'horizontal'
@@ -332,24 +331,21 @@
             orientation: 'vertical'
             height: "1dp"
 
-        GridLayout:
-            cols: 1
+        RecycleView:
+            id: stack_view
             size_hint_x: .5
+            viewclass: 'FoodCard'
 
-            ScrollView:
-                id: stack_scroll_view
-                do_scroll_x: False
-                do_scroll_y: True
+            RecycleBoxLayout:
+                padding: '5dp'
+                spacing: '5dp'
+                default_size: None, dp(80)
+                default_size_hint: 1, None
+                size_hint_y: None
+                height: self.minimum_height
+                orientation: 'vertical'
 
-                BoxLayout:
-                    orientation: 'vertical'
-                    id: stack_box_layout
-                    padding: '5dp'
-                    spacing: '5dp'
-                    size_hint: 1, None
-                    height: self.minimum_height
-
-                    # FoodCard widgets go here
+                # FoodCard widgets go here
 
     MDSeparator:
         height: "4dp"
