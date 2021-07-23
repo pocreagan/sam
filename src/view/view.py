@@ -218,11 +218,11 @@ class SelectStackDialog(MDDialog):
         if not cls.dialog:
             cls.dialog = cls()
         cls.dialog.content_cls.container.clear_widgets()
-        for s in cls.dialog.app.saved_stacks.values():
-            cls.dialog._stacks[s.name] = SelectStackOption(
-                text=s.name, secondary_text=s.created_at.strftime('%m/%d/%Y')
+        for name in sorted(cls.dialog.app.saved_stacks.keys()):
+            cls.dialog._stacks[name] = SelectStackOption(
+                text=name, secondary_text=cls.dialog.app.saved_stacks[name].created_at.strftime('%m/%d/%Y')
             )
-            cls.dialog.content_cls.container.add_widget(cls.dialog._stacks[s.name])
+            cls.dialog.content_cls.container.add_widget(cls.dialog._stacks[name])
 
         super(cls, cls.dialog).open()
 
