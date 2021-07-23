@@ -8,6 +8,7 @@ from typing import Set
 
 from kivy import Logger
 from kivy.animation import Animation
+from kivy.clock import Clock
 from kivy.clock import mainthread
 from kivy.core.window import Window
 from kivy.lang import Builder
@@ -371,8 +372,10 @@ class View(MDApp):
 
         self.snack_bar.open()
 
-    def after_stack_change(self, clear_field: bool = True) -> None:
-        self.focus_search_bar(clear_field)
+    def after_stack_change(self, clear_field: bool = True, delay: float = 0.) -> None:
+        def callback(*_) -> None:
+            self.focus_search_bar(clear_field)
+        Clock.schedule_once(callback, delay)
         self.stack_present = bool(self.stack.data)
 
     def add_food(self, food: db.Food) -> None:
@@ -399,7 +402,7 @@ class View(MDApp):
         log.info('clear_food_cards button pressed')
 
         self.stack.data = []
-        self.after_stack_change()
+        self.after_stack_change(delay=.1)
 
     def open_select_stack_dialog(self) -> None:
         if self.snack_bar_state:
