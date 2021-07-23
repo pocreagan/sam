@@ -91,6 +91,7 @@ def write_regions(ws: xlsxWorksheet, row: int, output: Output) -> int:
                 ws.write_number(bottom, col, nutrient_result.percent_of_guidance_level, fmt.copy().percentage()())
 
             else:
+                fmt.bg_color(NO_GUIDANCE_LEVEL_COLOR)
                 top_s = ''
                 if nutrient_result.guidance_level == NutrientLimitType.ND:
                     top_s = nutrient_result.guidance_level.name
