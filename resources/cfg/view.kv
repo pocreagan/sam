@@ -395,21 +395,25 @@
 
                         ButtonImage:
                             enabled: not app.stack_present
+                            disabled: not self.enabled
                             source: 'load.png' if self.enabled else 'load-grey.png'
                             on_press: app.open_select_stack_dialog()
 
                         ButtonImage:
                             enabled: app.stack_present
+                            disabled: not self.enabled
                             source: 'reset.png' if self.enabled else 'reset-grey.png'
                             on_press: app.clear_food_cards()
 
                         ButtonImage:
                             enabled: app.stack_present
+                            disabled: not self.enabled
                             source: 'save.png' if self.enabled else 'save-grey.png'
                             on_press: app.open_update_stack_dialog()
 
                         ButtonImage:
                             enabled: app.stack_present and app.region_selected
+                            disabled: not self.enabled
                             source: 'Excel.png' if self.enabled else 'Excel-grey.png'
                             on_press: app.begin_analysis()
 
