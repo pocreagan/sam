@@ -40,13 +40,6 @@ class Nutrient(Schema):
             .order_by(cls.name_id) \
             .all()
 
-    @classmethod
-    def all(cls, session: Session_t) -> Dict[int, str]:
-        nutrients = session.query(cls) \
-            .order_by(cls.id) \
-            .all()
-        return {nut.name_id: nut.name for nut in nutrients}
-
 
 class Region(Schema):
     _repr_fields = ['name', 'source']
@@ -128,12 +121,6 @@ class Food(Schema):
     @qty_per_serving.setter
     def qty_per_serving(self, grams: float) -> None:
         self._qty_per_serving = grams
-
-    @classmethod
-    def get(cls, session: Session_t, food_id: str) -> Optional['Food']:
-        return session.query(cls) \
-            .filter_by(food_id=food_id) \
-            .one_or_none()
 
 
 class NutrientData(Schema):
