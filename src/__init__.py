@@ -4,23 +4,9 @@ from pathlib import Path
 
 import yaml
 
-# noinspection SpellCheckingInspection
-os.environ["KIVY_NO_FILELOG"] = "1"
-os.environ["KIVY_NO_ARGS"] = "1"
-
-from kivy import Config
-from kivy.resources import resource_add_path
-
 __all__ = [
     '__RESOURCE__',
 ]
-
-_root_path = getattr(sys, '_MEIPASS', None)
-
-if _root_path is None:
-    source_dir = Path(__file__).absolute().parents[1]
-else:
-    source_dir = Path(_root_path)
 
 
 class Resource:
@@ -51,7 +37,23 @@ class Resource:
         return _p
 
 
-__RESOURCE__ = Resource(source_dir)
+def kivy_setup() -> None:
+    # noinspection SpellCheckingInspection
+    os.environ["KIVY_NO_FILELOG"] = "1"
+    os.environ["KIVY_NO_ARGS"] = "1"
 
-resource_add_path(__RESOURCE__.img())
-Config.read(__RESOURCE__.cfg('kivy_config.ini'))
+    from kivy import Config
+    from kivy.resources import resource_add_path
+
+    resource_add_path(__RESOURCE__.img())
+    Config.read(__RESOURCE__.cfg('kivy_config.ini'))
+    Config.set('kivy', 'window_icon', __RESOURCE__.img('favicon.ico'))
+
+
+_root_path = getattr(sys, '_MEIPASS', None)
+
+__RESOURCE__ = Resource(
+    Path(__file__).absolute().parents[1] if _root_path is None else Path(_root_path)
+)
+
+kivy_setup()

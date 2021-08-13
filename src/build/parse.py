@@ -32,6 +32,12 @@ from src.model import SessionManager
 from src.model.enums import FoodSource
 from src.model.enums import NutrientLimitType
 
+
+__all__ = [
+    'Parser',
+]
+
+
 NUTRIENT_START_COLUMN_INDEX = 3
 
 
@@ -93,9 +99,6 @@ class Model:
             raise ParseFailure(f'row#{i} canonical name `{k}` not in CanonicalNames')
 
 
-DATABASE_COMPLETE = object()
-
-
 @contextlib.contextmanager
 def worksheet(log: loggers.Logger, wb: Dict[str, pd.DataFrame], name: str,
               columns: Optional[List[str]]) -> ContextManager['WorkSheet']:
@@ -111,15 +114,6 @@ def worksheet(log: loggers.Logger, wb: Dict[str, pd.DataFrame], name: str,
         raise ParseFailure(f'{name}') from e
     else:
         log.debug(f'Parsed {name} ({format_time(time.perf_counter() - ti)})')
-
-
-def read_workbook(logger: loggers.Logger, fp: Path, sheets: List[str]) -> Dict[str, pd.DataFrame]:
-    log = logger.spawn(fp.name)
-    ti = time.perf_counter()
-    log.debug(f'Loading `{fp.name}`...')
-    wb = pd.read_excel(fp, sheet_name=sheets)
-    log.info(f'Loaded {fp.name} ({format_time(time.perf_counter() - ti)})')
-    return wb
 
 
 def read_workbook_buffer(logger: loggers.Logger, fp: Path, sheets: List[str]) -> Dict[str, pd.DataFrame]:

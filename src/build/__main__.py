@@ -20,7 +20,7 @@ CONN_STRING = 'sqlite:///' + __RESOURCE__.db('backend.db')
 DIST_PATH = __RESOURCE__.PROJECT_ROOT / 'dist'
 DAT_PATH = __RESOURCE__.PROJECT_ROOT / 'dat'
 
-SPEC_CHANGES = {
+SPEC_SAR = {
     '__SPLASH_PATH__': __RESOURCE__.img('splash.png'),
     '__ICON_PATH__': __RESOURCE__.img('android-chrome-512x512.ico'),
     '__ENTRY_POINT__': __RESOURCE__.PROJECT_ROOT / 'src' / 'app.py',
@@ -46,7 +46,7 @@ def main(debug: bool, release: bool) -> None:
         log.info('Parse successful' + '\n\n\n')
 
         if debug or release:
-            package(log, debug, release, SPEC_CHANGES)
+            package(log, debug, release, SPEC_SAR)
             log.info('Packaging successful')
 
         else:

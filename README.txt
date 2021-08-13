@@ -10,6 +10,10 @@
 	extract contents into `c:/upx_dir`
 	change .LICENSE to conform to your org's standard
 
+./Pipfile lists the app's top-level dependencies
+    this is consumed by pipenv, our package manager
+    GitHub dependabot scrapes this to alert us to CVEs
+
 ./build contains metadata from the build process
     spec/
         the build specification files produced by us, consumed by PyInstaller
