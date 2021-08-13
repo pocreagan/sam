@@ -1,4 +1,5 @@
 import time
+from pathlib import Path
 
 import click
 
@@ -46,6 +47,10 @@ def main(debug: bool, release: bool) -> None:
         log.info('Parse successful' + '\n\n\n')
 
         if debug or release:
+            if not Path('./.git').is_dir():
+                log.error(f'Cannot build outside git repo', exc_info=False)
+                exit(1)
+
             package(log, debug, release, SPEC_SAR)
             log.info('Packaging successful')
 
