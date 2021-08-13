@@ -1,7 +1,7 @@
 """
-performs instrument_setup on declarative_base factory
-declares mixin class that handles repr, time created, and primary key id: int
-Make contains convenience relationship instantiating to be used in db.py
+performs setup on declarative_base factory
+declares mixin class that handles repr, !time created, and primary key id: int
+Relationship contains convenience methods to be used in db.py
 """
 
 import datetime

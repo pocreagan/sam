@@ -1,4 +1,6 @@
 # -*- mode: python ; coding: utf-8 -*-
+# consumed by -m src.build
+
 
 DIST_PATH = r'__DIST_PATH__'
 DAT_PATH = r'__DAT_PATH__'

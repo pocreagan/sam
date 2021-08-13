@@ -10,3 +10,4 @@
 /resources/cfg/build.yml
 *.py[cod]
 __pycache__
+/*.lock
