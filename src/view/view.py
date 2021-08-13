@@ -48,12 +48,12 @@ from src.model.config import Model
 from src.output import Output
 from src.view.palette import *
 from src.view.utils import mainthread
+from src.view.utils import singleton
 
 __all__ = [
     'View',
 ]
 
-from src.view.utils import singleton
 
 log = loggers.Logger('View', Logger)
 
@@ -405,7 +405,6 @@ class View(MDApp):
 
     def on_start(self, *args) -> None:
         log.info(f'on_start called {time.perf_counter()}')
-        # register_topmost(Window, type(self).TITLE)
         self.close_splash_screen()
         set_always_on_top(type(self).TITLE)
         mainthread(lambda: set_not_always_on_top(type(self).TITLE))()

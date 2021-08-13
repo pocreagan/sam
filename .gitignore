@@ -3,6 +3,8 @@
 /.vscode/
 /dist/
 /build/
+/dat/
+/dev/
 /resources/db/*.db
 /src/_notebook/
 /resources/cfg/build.yml
